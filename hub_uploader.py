@@ -29,7 +29,7 @@ def main():
     
     # 3. Add Files
     print("Adding files to staging...")
-    run_command("git add cinematography_assistant.py prompt_templates.json requirements.txt")
+    run_command("git add cinematography_assistant.py prompt_templates.json requirements.txt README.md .gitignore secrets_template.toml")
     
     # 4. Commit
     commit_msg = input("Enter commit message (default: 'Update Assistant V2.7'): ") or "Update Assistant V2.7"

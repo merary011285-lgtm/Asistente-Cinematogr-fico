@@ -2,4 +2,7 @@ streamlit
 replicate
 openai
 google-generativeai
+google-genai
 fal-client
+librosa
+pydub

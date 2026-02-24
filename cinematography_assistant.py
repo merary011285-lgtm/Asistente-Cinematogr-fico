@@ -3,8 +3,12 @@ import json
 import os
 import replicate
 from openai import OpenAI
-import google.generativeai as genai
+import google.generativeai as st_genai # Older library for other uses if any
+from google import genai # New library for Imagen 3
 import fal_client
+import librosa
+import numpy as np
+import tempfile
 
 # Set page config for a premium look
 st.set_page_config(
@@ -163,20 +167,25 @@ def generate_image_gemini(prompt):
             st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
             return None
         
-        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        # Imagen 3 suele requerir el SDK de Vertex AI o el de Generative AI con el modelo específico
-        # Intentamos usar el modelo de Imagen 3 si está disponible en imagen-3.0-generate-001
-        model = genai.ImageGenerationModel("imagen-3.0-generate-001")
-        response = model.generate_images(
+        # Usando la nueva librería google-genai para Imagen 3
+        client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
+        response = client.models.generate_image(
+            model='imagen-3.0-generate-001',
             prompt=prompt,
-            number_of_images=1,
-            safety_filter_level="block_none",
-            aspect_ratio="16:9",
+            config={
+                'number_of_images': 1,
+                'aspect_ratio': '16:9',
+                'safety_filter_level': 'block_none'
+            }
         )
-        return response.images[0].url if response.images else None
+        # La respuesta contiene objetos de imagen con bytes o URLs
+        if response.generated_images:
+            return response.generated_images[0].image_resource.url 
+        return None
     except Exception as e:
-        # Fallback para versiones del SDK o modelos no disponibles aún en la región del usuario
+        # Fallback o error detallado
         st.error(f"Error con Gemini Imagen 3: {str(e)}")
+        # Intentar con st_genai si es necesario, pero Imagen 3 es mejor en google-genai
         return None
 
 def generate_image_fal(prompt):
@@ -201,13 +210,47 @@ def generate_image_fal(prompt):
         st.error(f"Error con Fal.ai: {str(e)}")
         return None
 
+def analyze_audio_with_gemini(audio_file_path, char_desc, vibe):
+    try:
+        if "GOOGLE_API_KEY" not in st.secrets:
+            st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
+            return None
+        
+        st_genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        model = st_genai.GenerativeModel("gemini-1.5-flash")
+        
+        # Upload audio to Gemini
+        audio_file = st_genai.upload_file(path=audio_file_path)
+        
+        prompt = f"""
+        Analyze this audio and create a detailed cinematographic storyboard.
+        Character Context: {char_desc}
+        Style/Vibe: {vibe}
+        
+        Output a 5-shot storyboard (or more if long) with timestamps every 5-10 seconds.
+        For each shot, provide:
+        - Timestamp (e.g., 0:05)
+        - Scene Action (English)
+        - Recommended Shot Type (English)
+        - Mood/Atmosphere (English)
+        
+        Maintain absolute visual consistency for the character across all shots.
+        Format the output clearly.
+        """
+        
+        response = model.generate_content([prompt, audio_file])
+        return response.text
+    except Exception as e:
+        st.error(f"Error analizando audio con Gemini: {str(e)}")
+        return None
+
 def main():
     templates = load_templates()
     
     st.title("🎬 Asistente Cinematográfico PRO V2: IMAX Hub")
     st.subheader("Firmas de Directores Maestros y Optimización Multi-Motor")
     
-    tabs = st.tabs(["🎯 Creador de Tomas", "📜 Analizador de Guiones"])
+    tabs = st.tabs(["🎮 Panel de Control", "📜 Analizador de Guion", "🎵 Ritmo & Audio (Storyboard)"])
     
     with st.sidebar:
         st.write("### 🎥 Cámara y Estilo")
@@ -357,6 +400,44 @@ def main():
                     st.write(f"**Acción:** *{json_res['descripcion']}*")
                     st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
                     st.code(diag_res, language="mermaid")
+
+    with tabs[2]:
+        st.write("### 🎵 Generador de Storyboard por Ritmo")
+        st.info("Sube una canción o audio para generar un storyboard sincronizado con el tempo y la letra.")
+        
+        uploaded_audio = st.file_uploader("Sube tu archivo de audio (mp3, wav)", type=["mp3", "wav"])
+        audio_char = st.text_input("Protagonista para el Storyboard:", placeholder="Un cosmonauta perdido en Marte")
+        
+        if uploaded_audio and st.button("🔥 GENERAR STORYBOARD SINCRONIZADO"):
+            with st.spinner("Analizando ritmo y narrativa..."):
+                # Save temp file for processing
+                with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_audio.name[uploaded_audio.name.rfind('.'):]) as tmp:
+                    tmp.write(uploaded_audio.getbuffer())
+                    tmp_path = tmp.name
+                
+                try:
+                    # 1. Librosa BPM Analysis
+                    y, sr = librosa.load(tmp_path)
+                    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+                    st.success(f"Tempo Detectado: {round(float(tempo), 1)} BPM")
+                    
+                    # 2. Gemini Analysis
+                    storyboard_text = analyze_audio_with_gemini(tmp_path, audio_char, director_choice)
+                    
+                    if storyboard_text:
+                        st.session_state['audio_storyboard'] = storyboard_text
+                        st.session_state['audio_bpm'] = tempo
+                finally:
+                    # Clean up
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+        
+        if 'audio_storyboard' in st.session_state:
+            st.write("### 📝 Storyboard Producido")
+            st.markdown(st.session_state['audio_storyboard'])
+            
+            st.write("---")
+            st.caption("Tip: Puedes copiar estas descripciones al Panel de Control para generar los prompts técnicos finales.")
 
 if __name__ == "__main__":
     main()
