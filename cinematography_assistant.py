@@ -158,7 +158,11 @@ def generate_image_openai(prompt):
         )
         return response.data[0].url
     except Exception as e:
-        st.error(f"Error con OpenAI: {str(e)}")
+        error_msg = str(e)
+        if "billing_hard_limit_reached" in error_msg or "insufficient_quota" in error_msg:
+            st.error("⚠️ **Límite de Facturación en OpenAI Alcanzado.**\n\nNo te preocupes, puedes seguir trabajando usando los otros motores:\n- Selecciona **🔥 Gemini (Imagen 3)** (si tienes créditos de Google).\n- Selecciona **🔥 Fal.ai (Flux)** (si tienes créditos en Fal.ai).")
+        else:
+            st.error(f"Error con OpenAI: {error_msg}")
         return None
 
 def generate_gpt5_intelligence(system_prompt, user_input):
@@ -176,7 +180,12 @@ def generate_gpt5_intelligence(system_prompt, user_input):
         )
         return response.output_text
     except Exception as e:
-        st.warning(f"GPT-5.2 no disponible o error: {str(e)}. Reintentando con GPT-4o...")
+        error_msg = str(e)
+        if "billing_hard_limit_reached" in error_msg or "insufficient_quota" in error_msg:
+            st.error("⚠️ **Créditos Agotados en OpenAI.**\n\nTu cuenta de OpenAI ha alcanzado su límite de gasto. El 'Cerebro GPT-5.2' no puede procesar el guion en este momento.\n\n**Solución**: Desactiva el interruptor 'Activar Cerebro GPT-5.2' en la barra lateral para usar la lógica local del asistente hasta que recargues tu cuenta.")
+            return None
+        
+        st.warning(f"GPT-5.2 no disponible o error: {error_msg}. Reintentando con GPT-4o...")
         try:
             # Fallback a chat.completions si el API Responses falla o no está soportado en la versión local
             client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -271,10 +280,24 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type):
         Format the output clearly using markdown.
         """
         
-        response = client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=[prompt, audio_file]
-        )
+        response = None
+        # Probamos varios identificadores comunes para asegurar compatibilidad en 2026
+        for model_id in ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.0-flash']:
+            try:
+                response = client.models.generate_content(
+                    model=model_id,
+                    contents=[prompt, audio_file]
+                )
+                if response: break
+            except Exception as e_model:
+                if "404" in str(e_model) or "not found" in str(e_model).lower():
+                    continue
+                else:
+                    raise e_model
+        
+        if not response:
+            return "Error: No se encontró un modelo de Gemini Flash compatible."
+            
         return response.text
     except Exception as e:
         st.error(f"Error analizando audio con Gemini (SDK GenAI): {str(e)}")
