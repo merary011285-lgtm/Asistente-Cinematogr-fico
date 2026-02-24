@@ -241,7 +241,7 @@ def generate_image_fal(prompt):
         st.error(f"Error con Fal.ai: {str(e)}")
         return None
 
-def analyze_audio_with_gemini(audio_file_path, char_desc, vibe):
+def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type):
     try:
         if "GOOGLE_API_KEY" not in st.secrets:
             st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
@@ -251,8 +251,9 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe):
         client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
         
         # Subir archivo usando el nuevo SDK (Google Gen AI)
+        # Especificamos el mime_type porque el SDK no siempre lo detecta en archivos temporales
         with open(audio_file_path, "rb") as f:
-            audio_file = client.files.upload(file=f)
+            audio_file = client.files.upload(file=f, config={'mime_type': mime_type})
         
         prompt = f"""
         Analyze this audio and create a detailed cinematographic storyboard.
@@ -473,7 +474,7 @@ def main():
                     st.success(f"Tempo Detectado: {round(bpm, 1)} BPM")
                     
                     # 2. Gemini Analysis
-                    storyboard_text = analyze_audio_with_gemini(tmp_path, audio_char, director_choice)
+                    storyboard_text = analyze_audio_with_gemini(tmp_path, audio_char, director_choice, uploaded_audio.type)
                     
                     if storyboard_text:
                         st.session_state['audio_storyboard'] = storyboard_text
