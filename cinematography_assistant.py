@@ -71,6 +71,19 @@ TEMPLATES = {
     "Cooke Anamórfico Vintage": "Warm tones, subtle lens flares, painterly bokeh, organic texture.",
     "Arri Alexa 65 (Digital Gran Formato)": "Ultra clean, massive dynamic range, modern glass characteristics."
   },
+  "camera_movements": {
+    "Estático (Fixed)": "Stable static camera, no movement, focus on composition.",
+    "Dolly In (Acercamiento)": "Slow dolly-in movement towards the subject, increasing tension.",
+    "Dolly Out (Alejamiento)": "Slow dolly-out movement away from the subject, revealing the environment.",
+    "Panorámica (Panning)": "Horizontal pan movement, scanning the horizon.",
+    "Tilt Up (Inclinación Arriba)": "Vertical tilt up movement, looking towards the sky or heights.",
+    "Tilt Down (Inclinación Abajo)": "Vertical tilt down movement, looking towards the ground.",
+    "Tracking Shot (Seguimiento)": "Lateral tracking shot following the character's movement.",
+    "Grúa (Crane Shot)": "High-angle crane shot, sweeping vertical and horizontal movement.",
+    "Handheld (Cámara en Mano)": "Visceral handheld camera, organic shaky movement, documentary feel.",
+    "Zoom In (Digital/Óptico)": "Intense zoom-in on details or emotions.",
+    "Orbit (Circular)": "Circular tracking shot orbiting the subject 360 degrees."
+  },
   "film_stocks": [
     "Kodak Vision3 500T (Poca luz, tonos fríos)",
     "Kodak Vision3 250D (Luz día, natural)",
@@ -80,11 +93,18 @@ TEMPLATES = {
   "shot_angles": {
     "Plano Gran General (EWS)": "Establishing the vast environment, character is small in frame, 1.43:1 ratio.",
     "Plano General (WS)": "Full body visible, clear relationship with environment.",
+    "Plano Americano (Cowboy)": "Waist up to mid-thigh, traditional western style shot.",
     "Plano Medio (MS)": "Waist up, focusing on interaction and wardrobe detail.",
+    "Plano Medio Corto (MCU)": "Chest up, focusing on facial expressions and posture.",
     "Primer Plano (CU)": "Tight on face, shallow depth of field, intense 70mm skin texture.",
+    "Primerísimo Primer Plano (ECU)": "Extreme tight shot on eyes or mouth, focusing on intense emotion.",
+    "Plano Detalle (XCU)": "Tiny detail of an object or texture, hyper-focused.",
+    "Ángulo Picado": "Looking down at the subject, making them appear vulnerable.",
     "Ángulo Contrapicado (Heroico)": "Looking up at character, making them appear powerful.",
     "Cenital / Vista de Pájaro": "Looking down, showing isolation or objective perspective.",
-    "Ángulo Holandés (Tensión)": "Tilted horizon, creating tension and unease."
+    "Ángulo Nadir": "Looking straight up from the ground, extreme low angle.",
+    "Ángulo Holandés (Tensión)": "Tilted horizon, creating tension and unease.",
+    "Plano de Perfil": "Side profile of the subject, highlighting silhouette and features."
   },
   "color_palettes": {
     "Clásico Teal & Orange": "Cool shadows, warm skin tones, high dynamic range pop.",
@@ -95,7 +115,7 @@ TEMPLATES = {
   }
 }
 
-def generate_prompt(scene, character, wardrobe, color, director, lens, stock, angle_name, angle_desc, engine):
+def generate_prompt(scene, character, wardrobe, color, director, lens, stock, movement, angle_name, angle_desc, engine):
     # Mapping técnico
     is_anamorphic = "Anamórfico" in lens or "Anamorphic" in lens
     aspect_ratio = "2.76:1 (Ultra Panavision)" if is_anamorphic else "1.43:1 (IMAX Full)"
@@ -115,7 +135,7 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, an
 
     # Prompt final (Totalmente en Inglés)
     full_prompt = (
-        f"{angle_name}: {scene}. {angle_desc}. {consistency_block}. {director}. {technical_details}. "
+        f"{angle_name}: {scene}. {angle_desc}. Camera Movement: {movement}. {consistency_block}. {director}. {technical_details}. "
         f"Key visual traits: {'oval bokeh, horizontal lens flares, ' if is_anamorphic else ''}"
         f"extreme detail, naturalistic grain, high dynamic range, 12k resolution texture, visceral atmosphere.{engine_suffix}"
     )
@@ -136,6 +156,7 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, an
     json_output = {
         "cinematógrafo": "Asistente IMAX Antigravity V2",
         "tipo_de_toma": angle_name,
+        "movimiento": movement,
         "motor_optimizado": engine,
         "descripcion": scene,
         "datos_de_consistencia": {
@@ -279,6 +300,9 @@ def main():
         
         lens_presets_keys = list(templates['lens_presets'].keys())
         lens_choice = st.selectbox("Características del Lente:", lens_presets_keys)
+
+        movement_keys = list(templates['camera_movements'].keys())
+        movement_choice = st.selectbox("Movimiento de Cámara:", movement_keys)
         
         stock_choice = st.selectbox("Tipo de Película (Stock):", templates['film_stocks'])
         
@@ -315,6 +339,7 @@ def main():
                             templates['director_styles'][director_choice],
                             lens_choice,
                             stock_choice,
+                            templates['camera_movements'][movement_choice],
                             angle,
                             templates['shot_angles'][angle],
                             engine_choice
@@ -326,9 +351,15 @@ def main():
             st.write("### 💎 Salida Cinematográfica (V2)")
             if 'shot_list_v2' in st.session_state:
                 for i, (json_res, prompt_res, diag_res) in enumerate(st.session_state['shot_list_v2']):
-                    with st.expander(f"Toma {i+1}: {json_res['tipo_de_toma']} ({engine_choice})", expanded=(i==0)):
-                        st.write("#### 🚀 Prompt Optimizado (Copia esto)")
+                    with st.expander(f"Toma {i+1}: {json_res['tipo_de_toma']} | {json_res['movimiento']} ({engine_choice})", expanded=(i==0)):
+                        st.write("#### 🚀 Prompt Optimizado")
                         st.text_area(f"Prompt {i+1}:", value=prompt_res, height=120, key=f"p_v2_{i}")
+                        
+                        # Copy button implementation
+                        if st.button(f"📋 Copiar Prompt {i+1}", key=f"copy_v2_{i}"):
+                            st.write(f'<script>navigator.clipboard.writeText("{prompt_res}");</script>', unsafe_allow_html=True)
+                            st.success("¡Copiado al portapapeles!")
+
                         st.write("---")
                         # Image generation removed per user request
                 
@@ -378,6 +409,7 @@ def main():
                         templates['director_styles'][director_choice],
                         lens_choice,
                         stock_choice,
+                        templates['camera_movements'][movement_choice],
                         angle,
                         templates['shot_angles'][angle],
                         engine_choice
@@ -388,7 +420,7 @@ def main():
         if 'parsed_list' in st.session_state:
             st.write("### 🎬 Lista de Tomas Derivada del Guion")
             for i, (json_res, prompt_res, diag_res) in enumerate(st.session_state['parsed_list']):
-                with st.expander(f"Momento de Escena {i+1}: {json_res['tipo_de_toma']}", expanded=(i==0)):
+                with st.expander(f"Momento de Escena {i+1}: {json_res['tipo_de_toma']} | {json_res['movimiento']}", expanded=(i==0)):
                     st.write(f"**Acción:** *{json_res['descripcion']}*")
                     
                     # Botón de carga rápida
@@ -400,6 +432,11 @@ def main():
                         st.rerun()
 
                     st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
+                    
+                    # Copy button for script analyzer as well
+                    if st.button(f"📋 Copiar Prompt {i+1}", key=f"cp_script_{i}"):
+                        st.write(f'<script>navigator.clipboard.writeText("{prompt_res}");</script>', unsafe_allow_html=True)
+                        st.success("¡Copiado al portapapeles!")
 
     with tabs[2]:
         st.write("### 🎵 Generador de Storyboard por Ritmo")
