@@ -50,99 +50,177 @@ def load_templates():
     with open('prompt_templates.json', 'r') as f:
         return json.load(f)
 
-def generate_prompt(scene, character, wardrobe, color, director, lens, stock, angle_name, angle_desc):
-    # Technical mapping
-    is_anamorphic = "Anamorphic" in lens
+def generate_prompt(scene, character, wardrobe, color, director, lens, stock, angle_name, angle_desc, engine):
+    # Mapping técnico
+    is_anamorphic = "Anamórfico" in lens or "Anamorphic" in lens
     aspect_ratio = "2.76:1 (Ultra Panavision)" if is_anamorphic else "1.43:1 (IMAX Full)"
     
     technical_details = f"Shot on IMAX MSM 9802 15/70mm film, {lens} lenses, {stock} film stock. Aspect ratio {aspect_ratio}."
     
-    # Consistency Anchors
-    consistency_block = f"Character: {character}. Wardrobe: {wardrobe}. Color Palette: {color}."
+    # Anclas de Consistencia (en inglés para la IA)
+    consistency_block = f"Character trait: {character}. Wardrobe: {wardrobe}. Color Palette: {color}."
     
+    # Optimización del Motor
+    engine_suffix = ""
+    if engine == "Midjourney":
+        ratio = "2.76:1" if is_anamorphic else "1.43:1"
+        engine_suffix = f" --ar {ratio} --v 6 --stylize 250"
+    elif engine == "DALL-E 3":
+        engine_suffix = " Wide-screen cinematic mode, highly detailed."
+
+    # Prompt final (Totalmente en Inglés)
     full_prompt = (
         f"{angle_name}: {scene}. {angle_desc}. {consistency_block}. {director}. {technical_details}. "
         f"Key visual traits: {'oval bokeh, horizontal lens flares, ' if is_anamorphic else ''}"
-        f"extreme detail, naturalistic grain, high dynamic range, 12k resolution texture, visceral atmosphere."
+        f"extreme detail, naturalistic grain, high dynamic range, 12k resolution texture, visceral atmosphere.{engine_suffix}"
     )
     
+    # Lógica de Iluminación para Mermaid
+    diagram = f"graph TD\n    CAM[Cámara IMAX] --- SUB[({character})]\n"
+    if "Natural" in director or "Deakins" in director or "Naturalista" in director:
+        diagram += "    SUN[Fuente de Luz Natural] --> SUB\n    BOUNCE[Rebotador Muslin] --> SUB"
+    elif "Richardson" in director:
+        diagram += "    HALO[Luz Halo Cenital] --> SUB\n    BACK[Contraluz de Recorte] --> SUB"
+    else:
+        diagram += "    KEY[Luz Principal] --> SUB\n    FILL[Luz de Relleno] --> SUB\n    RIM[Luz de Recorte] --> SUB"
+
     json_output = {
-        "cinematographer": "Antigravity IMAX Assistant",
-        "shot_type": angle_name,
-        "description": scene,
-        "consistency_data": {
-            "character_traits": character,
-            "wardrobe": wardrobe,
-            "color_palette": color
+        "cinematógrafo": "Asistente IMAX Antigravity V2",
+        "tipo_de_toma": angle_name,
+        "motor_optimizado": engine,
+        "descripcion": scene,
+        "datos_de_consistencia": {
+            "rasgos_personaje": character,
+            "vestuario": wardrobe,
+            "paleta_color": color
         },
-        "technical_stack": {
-            "format": "IMAX 70mm (15-perf)",
-            "lens": lens,
-            "stock": stock,
-            "aspect_ratio": aspect_ratio
+        "stack_tecnico": {
+            "formato": "IMAX 70mm (15-perf)",
+            "lente": lens,
+            "pelicula": stock,
+            "relacion_aspecto": aspect_ratio
         },
-        "director_intent": director,
-        "final_prompt": full_prompt
+        "intencion_director": director,
+        "esquema_iluminacion": diagram,
+        "prompt_final": full_prompt
     }
-    return json_output, full_prompt
+    return json_output, full_prompt, diagram
 
 def main():
     templates = load_templates()
     
-    st.title("🎬 Assistant Cinematographique PRO: IMAX 70mm")
-    st.subheader("Consistent characters & multi-angle shot lists")
+    st.title("🎬 Asistente Cinematográfico PRO V2: IMAX Hub")
+    st.subheader("Firmas de Directores Maestros y Optimización Multi-Motor")
+    
+    tabs = st.tabs(["🎯 Creador de Tomas", "📜 Analizador de Guiones"])
     
     with st.sidebar:
-        st.write("### 🎥 Camera & Style")
-        director_choice = st.selectbox("Director Visual Style:", list(templates['director_styles'].keys()))
-        lens_choice = st.selectbox("Lens Characteristics:", list(templates['lens_presets'].keys()))
-        stock_choice = st.selectbox("Film Stock:", templates['film_stocks'])
-        color_choice = st.selectbox("Color Palette:", list(templates['color_palettes'].keys()))
-
-    col1, col2 = st.columns([1, 1.5])
-    
-    with col1:
-        st.write("### 👥 Scene & Character Consistency")
-        scene_desc = st.text_area("Scene Setting (Environment):", placeholder="An abandoned space station orbiting a dying sun...")
-        char_desc = st.text_area("Character Profile (Consistent traits):", placeholder="A grizzled veteran with a mechanical arm and white beard.")
-        wardrobe_desc = st.text_input("Wardrobe Details:", placeholder="Worn flight suit with patched insignia.")
+        st.write("### 🎥 Cámara y Estilo")
+        director_choice = st.selectbox("Firma Visual del Director:", list(templates['director_styles'].keys()))
+        lens_choice = st.selectbox("Características del Lente:", list(templates['lens_presets'].keys()))
+        stock_choice = st.selectbox("Tipo de Película (Stock):", templates['film_stocks'])
+        color_choice = st.selectbox("Paleta de Color:", list(templates['color_palettes'].keys()))
         
-        st.write("### 📸 Shot Angles")
-        selected_angles = st.multiselect("Select angles for the shot list:", list(templates['shot_angles'].keys()), default=["Wide Shot (WS)", "Close-Up (CU)"])
+        st.write("### 🚀 Motor de IA Destino")
+        engine_choice = st.selectbox("Optimizar para:", ["Meta AI / Grok", "Midjourney", "DALL-E 3", "Qwen / Flux"])
 
-        if st.button("🎬 ACTION: Generate Shot List"):
-            if not scene_desc or not char_desc:
-                st.error("Please provide both scene and character descriptions.")
+    with tabs[0]:
+        col1, col2 = st.columns([1, 1.5])
+        
+        with col1:
+            st.write("### 👥 Escena y Consistencia de Personaje")
+            scene_desc = st.text_area("Entorno de la Escena:", placeholder="Una estación espacial abandonada orbitando un sol moribundo...", key="scene_creator")
+            char_desc = st.text_area("Perfil del Personaje (Rasgos constantes):", placeholder="Un veterano curtido con un brazo mecánico y barba blanca.", key="char_creator")
+            wardrobe_desc = st.text_input("Detalles del Vestuario:", placeholder="Traje de vuelo desgastado con insignias remendadas.", key="wardrobe_creator")
+            
+            st.write("### 📸 Ángulos de Cámara")
+            selected_angles = st.multiselect("Selecciona ángulos para la lista de tomas:", list(templates['shot_angles'].keys()), default=["Plano General (WS)", "Primer Plano (CU)"], key="angles_creator")
+
+            if st.button("🎬 ACCIÓN: Generar Lista de Tomas"):
+                if not scene_desc or not char_desc:
+                    st.error("Por favor, proporciona descripciones de la escena y del personaje.")
+                else:
+                    results = []
+                    for angle in selected_angles:
+                        json_res, prompt_res, diag_res = generate_prompt(
+                            scene_desc, 
+                            char_desc,
+                            wardrobe_desc,
+                            templates['color_palettes'][color_choice],
+                            templates['director_styles'][director_choice],
+                            lens_choice,
+                            stock_choice,
+                            angle,
+                            templates['shot_angles'][angle],
+                            engine_choice
+                        )
+                        results.append((json_res, prompt_res, diag_res))
+                    st.session_state['shot_list_v2'] = results
+
+        with col2:
+            st.write("### 💎 Salida Cinematográfica (V2)")
+            if 'shot_list_v2' in st.session_state:
+                for i, (json_res, prompt_res, diag_res) in enumerate(st.session_state['shot_list_v2']):
+                    with st.expander(f"Toma {i+1}: {json_res['tipo_de_toma']} ({engine_choice})", expanded=(i==0)):
+                        st.write("#### 🚀 Prompt Optimizado (Copia esto)")
+                        st.text_area(f"Prompt {i+1}:", value=prompt_res, height=120, key=f"p_v2_{i}")
+                        
+                        st.write("#### 💡 Esquema de Iluminación (Diagrama)")
+                        st.code(diag_res, language="mermaid")
+                        st.info("Copia el código de arriba en un editor Mermaid para ver el diagrama visual.")
+                        
+                        st.write("#### 📝 Metadatos JSON")
+                        st.code(json.dumps(json_res, indent=2, ensure_ascii=False), language="json")
+                
+                st.info("💡 **Tip de Fase 2:** El prompt ahora incluye modificadores técnicos específicos para el motor de IA seleccionado.")
             else:
+                st.write("Completa los detalles y elige un Director Maestro para generar tus tomas.")
+
+    with tabs[1]:
+        st.write("### 🖊️ Pegar Fragmento de Guion")
+        script_text = st.text_area("Fragmento del Guion (Acción y Diálogos):", placeholder="EXT. ESTACIÓN ESPACIAL - ATARDECER\nMax está frente a la esclusa, mirando al abismo. Suspira, su brazo metálico brilla...", height=200)
+        
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            parser_char = st.text_input("Ancla de Identidad del Personaje:", placeholder="Max, el veterano curtido")
+        with col_c2:
+            parser_wardrobe = st.text_input("Ancla de Vestuario:", placeholder="Traje de vuelo andrajoso")
+
+        if st.button("🔨 ANALIZAR GUION Y CREAR TOMAS"):
+            if not script_text or not parser_char:
+                st.error("Por favor, proporciona el texto del guion e identidad del personaje.")
+            else:
+                # Simple logic to simulate "parsing" key moments (split by sentences or common script markers)
+                moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10]
+                if not moments: moments = [script_text[:100]] # Fallback
+                
+                # Assign angles based on keywords or cycle
+                angle_list = list(templates['shot_angles'].keys())
                 results = []
-                for angle in selected_angles:
-                    json_res, prompt_res = generate_prompt(
-                        scene_desc, 
-                        char_desc,
-                        wardrobe_desc,
+                for i, moment in enumerate(moments[:5]): # Limit to first 5 moments for demo
+                    angle = angle_list[i % len(angle_list)]
+                    json_res, prompt_res, diag_res = generate_prompt(
+                        moment, 
+                        parser_char,
+                        parser_wardrobe,
                         templates['color_palettes'][color_choice],
                         templates['director_styles'][director_choice],
                         lens_choice,
                         stock_choice,
                         angle,
-                        templates['shot_angles'][angle]
+                        templates['shot_angles'][angle],
+                        engine_choice
                     )
-                    results.append((json_res, prompt_res))
-                st.session_state['shot_list'] = results
+                    results.append((json_res, prompt_res, diag_res))
+                st.session_state['parsed_list'] = results
 
-    with col2:
-        st.write("### 💎 Cinematic Shot List")
-        if 'shot_list' in st.session_state:
-            for i, (json_res, prompt_res) in enumerate(st.session_state['shot_list']):
-                with st.expander(f"Shot {i+1}: {json_res['shot_type']}", expanded=(i==0)):
-                    st.write("#### 🚀 Prompt")
-                    st.text_area(f"Prompt {i+1}:", value=prompt_res, height=120, key=f"p_{i}")
-                    st.write("#### 📝 JSON Data")
-                    st.code(json.dumps(json_res, indent=2), language="json")
-            
-            st.info("💡 **Consistency Tip:** Copy the 'Character Profile' exactly for all image generator iterations to maintain face/body traits.")
-        else:
-            st.write("Fill in the scene and character details to generate your cinematic shot list.")
+        if 'parsed_list' in st.session_state:
+            st.write("### 🎬 Lista de Tomas Derivada del Guion")
+            for i, (json_res, prompt_res, diag_res) in enumerate(st.session_state['parsed_list']):
+                with st.expander(f"Momento de Escena {i+1}: {json_res['tipo_de_toma']}", expanded=(i==0)):
+                    st.write(f"**Acción:** *{json_res['descripcion']}*")
+                    st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
+                    st.code(diag_res, language="mermaid")
 
 if __name__ == "__main__":
     main()

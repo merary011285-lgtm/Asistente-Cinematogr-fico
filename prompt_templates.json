@@ -1,36 +1,39 @@
 {
   "director_styles": {
-    "Epic / Large Scale (Nolan)": "Grand scale architectures, visceral realism, physical practical effects, vast landscapes, 1.43:1 full IMAX height.",
-    "Moody / Sci-Fi (Villeneuve)": "Atmospheric fog, silhouette lighting, brutalist architecture, monochromatic or bi-color palettes, 1.90:1 digital IMAX.",
-    "Retro / Technicolor": "Saturated primary colors, high contrast, golden age of Hollywood lighting, visible grain, 4:3 Academy ratio feel.",
-    "Gritty / Documentary Style": "Handheld 65mm feel, natural lighting, sweat and dirt detail, muted colors, high texture."
+    "Épico / Escala Masiva (Nolan)": "Grand scale architectures, visceral realism, physical practical effects, vast landscapes, 1.43:1 full IMAX height.",
+    "Atmosférico / Ciencia Ficción (Villeneuve)": "Atmospheric fog, silhouette lighting, brutalist architecture, monochromatic or bi-color palettes, 1.90:1 digital IMAX.",
+    "Roger Deakins (Naturalista)": "Motivated naturalistic lighting, muslin bounce, mid-wide 35mm focal lengths, extreme contrast precision, sharp clean textures.",
+    "Emmanuel Lubezki (Inmersivo)": "Natural light only (magic hour), ultra-wide 12-24mm, immersive long takes, zero grain, visceral proximity to subject.",
+    "Robert Richardson (Gótico/Halo)": "Strong rim lighting, HALO top-down effect, blooming highlights, high color contrast, Panavision anamorphic texture.",
+    "Greig Fraser (Táctil/LED)": "Chiaroscuro (shadow play), digital-native textures, LED-screen ambient light, shallow depth of field, epic scope.",
+    "Estilo Documental Rudo": "Handheld 65mm feel, natural lighting, sweat and dirt detail, muted colors, high texture."
   },
   "lens_presets": {
-    "Panavision Ultra 70 (Anamorphic)": "2x squeeze, intense oval bokeh, horizontal blue lens flares, sharp center with edge falloff.",
-    "IMAX Hasselblad (Spherical)": "Tack sharp from corner to corner, zero distortion, deep depth of field, 15/70mm resolution.",
-    "Vintage Cooke Anamorphic": "Warm tones, subtle lens flares, painterly bokeh, organic texture.",
-    "Arri Alexa 65 (Digital Large Format)": "Ultra clean, massive dynamic range, modern glass characteristics."
+    "Panavision Ultra 70 (Anamórfico)": "2x squeeze, intense oval bokeh, horizontal blue lens flares, sharp center with edge falloff.",
+    "IMAX Hasselblad (Esférico)": "Tack sharp from corner to corner, zero distortion, deep depth of field, 15/70mm resolution.",
+    "Cooke Anamórfico Vintage": "Warm tones, subtle lens flares, painterly bokeh, organic texture.",
+    "Arri Alexa 65 (Digital Gran Formato)": "Ultra clean, massive dynamic range, modern glass characteristics."
   },
   "film_stocks": [
-    "Kodak Vision3 500T (Low light, cool tones)",
-    "Kodak Vision3 250D (Daylight, natural)",
-    "Kodak Eastman Double-X (Black and White)",
-    "Fuji Eterna (High saturation, deep greens/blues)"
+    "Kodak Vision3 500T (Poca luz, tonos fríos)",
+    "Kodak Vision3 250D (Luz día, natural)",
+    "Kodak Eastman Double-X (Blanco y Negro)",
+    "Fuji Eterna (Alta saturación, verdes/azules profundos)"
   ],
   "shot_angles": {
-    "Extreme Wide Shot (EWS)": "Establishing the vast environment, character is small in frame, 1.43:1 ratio.",
-    "Wide Shot (WS)": "Full body visible, clear relationship with environment.",
-    "Medium Shot (MS)": "Waist up, focusing on interaction and wardrobe detail.",
-    "Close-Up (CU)": "Tight on face, shallow depth of field, intense 70mm skin texture.",
-    "Low Angle (Hero)": "Looking up at character, making them appear powerful.",
-    "High Angle / Bird's Eye": "Looking down, showing isolation or objective perspective.",
-    "Dutch Angle": "Tilted horizon, creating tension and unease."
+    "Plano Gran General (EWS)": "Establishing the vast environment, character is small in frame, 1.43:1 ratio.",
+    "Plano General (WS)": "Full body visible, clear relationship with environment.",
+    "Plano Medio (MS)": "Waist up, focusing on interaction and wardrobe detail.",
+    "Primer Plano (CU)": "Tight on face, shallow depth of field, intense 70mm skin texture.",
+    "Ángulo Contrapicado (Heroico)": "Looking up at character, making them appear powerful.",
+    "Cenital / Vista de Pájaro": "Looking down, showing isolation or objective perspective.",
+    "Ángulo Holandés (Tensión)": "Tilted horizon, creating tension and unease."
   },
   "color_palettes": {
-    "Classic Teal & Orange": "Cool shadows, warm skin tones, high dynamic range pop.",
-    "Desaturated / Bleach Bypass": "High contrast, gritty, muted colors, metallic feel.",
-    "Rich Technicolor Heritage": "Deep reds and blues, high saturation, nostalgic 1950s epic feel.",
-    "Monochrome (Double-X)": "Hyper-detailed black and white, deep blacks, glowing silver highlights.",
-    "Neon Noir": "Vibrant pinks and cyans against deep darkness."
+    "Clásico Teal & Orange": "Cool shadows, warm skin tones, high dynamic range pop.",
+    "Desaturado / Bleach Bypass": "High contrast, gritty, muted colors, metallic feel.",
+    "Tecnicolor Heredado": "Deep reds and blues, high saturation, nostalgic 1950s epic feel.",
+    "Monocromo (Double-X)": "Hyper-detailed black and white, deep blacks, glowing silver highlights.",
+    "Neón Noir": "Vibrant pinks and cyans against deep darkness."
   }
 }
