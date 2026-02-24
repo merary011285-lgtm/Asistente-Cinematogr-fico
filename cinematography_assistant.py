@@ -215,7 +215,7 @@ def generate_image_gemini(prompt):
             config={
                 'number_of_images': 1,
                 'aspect_ratio': '16:9',
-                'safety_filter_level': 'block_none'
+                'safety_filter_level': 'block_only_high'
             }
         )
         # La respuesta en google-genai contiene una lista de imágenes
@@ -251,7 +251,11 @@ def generate_image_fal(prompt):
             return result["images"][0]["url"]
         return None
     except Exception as e:
-        st.error(f"Error con Fal.ai: {str(e)}")
+        error_msg = str(e)
+        if "Exhausted balance" in error_msg or "locked" in error_msg.lower():
+            st.error("⚠️ **Saldo Agotado en Fal.ai.**\n\nTu cuenta de Fal.ai no tiene créditos suficientes.\n\n**Solución**: \n- Selecciona **🔥 Gemini (Imagen 3)** (Google).\n- Selecciona **🔥 Replicate (Flux)** (si tienes saldo en Replicate).")
+        else:
+            st.error(f"Error con Fal.ai: {error_msg}")
         return None
 
 def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type):
