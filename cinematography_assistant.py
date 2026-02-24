@@ -479,6 +479,15 @@ def main():
             for i, (json_res, prompt_res, diag_res) in enumerate(st.session_state['parsed_list']):
                 with st.expander(f"Momento de Escena {i+1}: {json_res['tipo_de_toma']}", expanded=(i==0)):
                     st.write(f"**Acción:** *{json_res['descripcion']}*")
+                    
+                    # Botón de carga rápida (Solicitado por el usuario)
+                    if st.button(f"📋 Cargar Toma {i+1} en Panel (Pega esto)", key=f"btn_copy_{i}"):
+                        st.session_state['scene_creator'] = json_res['descripcion']
+                        st.session_state['char_creator'] = json_res['personaje']
+                        st.session_state['wardrobe_creator'] = json_res['vestuario']
+                        st.success(f"¡Toma {i+1} cargada satisfactoriamente! Ve a la pestaña 'Panel de Control'.")
+                        st.rerun()
+
                     st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
                     st.code(diag_res, language="mermaid")
 
