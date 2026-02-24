@@ -270,7 +270,7 @@ def generate_image_fal(prompt):
             st.error(f"Error con Fal.ai: {error_msg}")
         return None
 
-def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type):
+def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type, duration_seconds=0):
     try:
         if "GOOGLE_API_KEY" not in st.secrets:
             st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
@@ -280,21 +280,26 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type):
         client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
         
         # Subir archivo usando el nuevo SDK (Google Gen AI)
-        # Especificamos el mime_type porque el SDK no siempre lo detecta en archivos temporales
         with open(audio_file_path, "rb") as f:
             audio_file = client.files.upload(file=f, config={'mime_type': mime_type})
         
+        # Duración legible para el prompt
+        duration_info = f"Duration: {round(duration_seconds, 1)} seconds." if duration_seconds > 0 else ""
+        
         prompt = f"""
-        Analyze this audio and create a detailed cinematographic storyboard.
+        Analyze this audio ({duration_info}) and create a COMPREHENSIVE cinematographic storyboard that covers the ENTIRE timeline from start to finish.
+        
         Character Context: {char_desc}
         Style/Vibe: {vibe}
         
-        Output a 5-shot storyboard (or more if long) with timestamps every 5-10 seconds.
-        For each shot, provide:
-        - Timestamp (e.g., 0:05)
-        - Scene Action (English)
-        - Recommended Shot Type (English)
-        - Mood/Atmosphere (English)
+        Mandatory Rules:
+        1. Distribution: Spread shots evenly across the whole {duration_seconds}s. Do NOT stop after the first 60 seconds.
+        2. Sequence: Provide as many shots as needed to represent the full emotional arc of the audio.
+        3. For each shot, provide:
+           - Timestamp (e.g., 0:05, 1:20, 2:45)
+           - Scene Action (English)
+           - Recommended Shot Type (English)
+           - Mood/Atmosphere (English)
         
         Maintain absolute visual consistency for the character across all shots.
         Format the output clearly using markdown.
@@ -518,15 +523,15 @@ def main():
                     tmp_path = tmp.name
                 
                 try:
-                    # 1. Librosa BPM Analysis
+                    # 1. Librosa BPM & Duration Analysis
                     y, sr = librosa.load(tmp_path)
+                    duration_secs = librosa.get_duration(y=y, sr=sr)
                     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-                    # Convertimos a scalar si es un array (común en nuevas versiones de librosa)
                     bpm = float(np.mean(tempo))
-                    st.success(f"Tempo Detectado: {round(bpm, 1)} BPM")
+                    st.success(f"Track Detectado: {round(bpm, 1)} BPM | Duración: {round(duration_secs, 1)}s")
                     
                     # 2. Gemini Analysis
-                    storyboard_text = analyze_audio_with_gemini(tmp_path, audio_char, director_choice, uploaded_audio.type)
+                    storyboard_text = analyze_audio_with_gemini(tmp_path, audio_char, director_choice, uploaded_audio.type, duration_secs)
                     
                     if storyboard_text:
                         st.session_state['audio_storyboard'] = storyboard_text
