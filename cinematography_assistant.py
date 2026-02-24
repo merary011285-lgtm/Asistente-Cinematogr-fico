@@ -3,6 +3,8 @@ import json
 import os
 import replicate
 from openai import OpenAI
+import google.generativeai as genai
+import fal_client
 
 # Set page config for a premium look
 st.set_page_config(
@@ -155,6 +157,50 @@ def generate_image_openai(prompt):
         st.error(f"Error con OpenAI: {str(e)}")
         return None
 
+def generate_image_gemini(prompt):
+    try:
+        if "GOOGLE_API_KEY" not in st.secrets:
+            st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
+            return None
+        
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        # Imagen 3 suele requerir el SDK de Vertex AI o el de Generative AI con el modelo específico
+        # Intentamos usar el modelo de Imagen 3 si está disponible en imagen-3.0-generate-001
+        model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+        response = model.generate_images(
+            prompt=prompt,
+            number_of_images=1,
+            safety_filter_level="block_none",
+            aspect_ratio="16:9",
+        )
+        return response.images[0].url if response.images else None
+    except Exception as e:
+        # Fallback para versiones del SDK o modelos no disponibles aún en la región del usuario
+        st.error(f"Error con Gemini Imagen 3: {str(e)}")
+        return None
+
+def generate_image_fal(prompt):
+    try:
+        if "FAL_KEY" not in st.secrets:
+            st.error("Falta FAL_KEY en los secretos de Streamlit.")
+            return None
+        
+        # Usamos Flux.1 [dev] via fal-client (el famoso 'Flow')
+        handler = fal_client.submit(
+            "fal-ai/flux/dev",
+            arguments={
+                "prompt": prompt,
+                "image_size": "landscape_16_9"
+            },
+        )
+        result = handler.get()
+        if "images" in result and result["images"]:
+            return result["images"][0]["url"]
+        return None
+    except Exception as e:
+        st.error(f"Error con Fal.ai: {str(e)}")
+        return None
+
 def main():
     templates = load_templates()
     
@@ -223,25 +269,44 @@ def main():
                         
                         st.write("---")
                         st.write("#### 🎨 Generación de Imagen Directa")
-                        gen_col1, gen_col2 = st.columns(2)
                         
-                        btn_key = f"gen_btn_{i}_{engine_choice}"
+                        btn_key_base = f"gen_btn_{i}_{engine_choice}"
                         
-                        if engine_choice == "Midjourney" or engine_choice == "Qwen / Flux":
-                             if gen_col1.button("✨ Generar con FLUX (Replicate)", key=btn_key):
-                                with st.spinner("Generando imagen maestra en Flux..."):
-                                    img_url = generate_image_replicate(prompt_res)
-                                    if img_url:
-                                        st.image(img_url, caption=f"Resultado Flux: {json_res['tipo_de_toma']}")
+                        # Detectamos qué llaves están presentes
+                        has_openai = "OPENAI_API_KEY" in st.secrets
+                        has_gemini = "GOOGLE_API_KEY" in st.secrets
+                        has_fal = "FAL_KEY" in st.secrets
+                        has_replicate = "REPLICATE_API_TOKEN" in st.secrets
                         
-                        elif engine_choice == "DALL-E 3":
-                            if gen_col1.button("🚀 Generar con DALL-E 3", key=btn_key):
-                                with st.spinner("Generando imagen en DALL-E 3..."):
-                                    img_url = generate_image_openai(prompt_res)
-                                    if img_url:
-                                        st.image(img_url, caption=f"Resultado DALL-E 3: {json_res['tipo_de_toma']}")
+                        if not any([has_openai, has_gemini, has_fal, has_replicate]):
+                            st.warning("⚠️ No se detectaron llaves de API. Configura `.streamlit/secrets.toml` para habilitar la generación.")
                         else:
-                            st.warning("Selecciona 'Midjourney/Flux' o 'DALL-E 3' en el motor para habilitar la generación directa.")
+                            st.info("Elige el proveedor según tus créditos disponibles:")
+                            cols = st.columns(4)
+                            
+                            if has_openai:
+                                if cols[0].button("🚀 DALL-E 3", key=f"{btn_key_base}_oa"):
+                                    with st.spinner("Generando en DALL-E 3..."):
+                                        img_url = generate_image_openai(prompt_res)
+                                        if img_url: st.image(img_url, caption="Resultado DALL-E 3")
+                            
+                            if has_gemini:
+                                if cols[1].button("♊ Gemini/Imagen", key=f"{btn_key_base}_gem"):
+                                    with st.spinner("Generando en Imagen 3..."):
+                                        img_url = generate_image_gemini(prompt_res)
+                                        if img_url: st.image(img_url, caption="Resultado Imagen 3")
+
+                            if has_fal:
+                                if cols[2].button("🔥 Fal.ai (Flux)", key=f"{btn_key_base}_fal"):
+                                    with st.spinner("Generando en Fal.ai (Flux)..."):
+                                        img_url = generate_image_fal(prompt_res)
+                                        if img_url: st.image(img_url, caption="Resultado Fal/Flux")
+
+                            if has_replicate:
+                                if cols[3].button("🌀 Replicate", key=f"{btn_key_base}_repl"):
+                                    with st.spinner("Generando en Replicate..."):
+                                        img_url = generate_image_replicate(prompt_res)
+                                        if img_url: st.image(img_url, caption="Resultado Replicate")
                 
                 st.info("💡 **Tip de Fase 2:** El prompt ahora incluye modificadores técnicos específicos para el motor de IA seleccionado.")
             else:

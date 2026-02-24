@@ -1,6 +1,5 @@
-import os
 import subprocess
-import sys
+import os
 
 def run_command(command):
     try:
@@ -13,49 +12,40 @@ def run_command(command):
         return None
 
 def main():
-    print("🎬 Cinematographic Assistant: HUB Uploader (APY)")
+    print("Cinematographic Assistant: HUB Uploader (APY)")
     print("===============================================")
     
     # 1. Check for Git
-    git_check = run_command("git --version")
-    if not git_check:
-        print("❌ Git not found. Please install Git to use this uploader.")
+    git_version = run_command("git --version")
+    if not git_version:
+        print("Git not found. Please install Git to use this uploader.")
         return
 
     # 2. Initialize Repo if not exists
     if not os.path.exists(".git"):
-        print("📦 Initializing local repository...")
+        print("Initializing local repository...")
         run_command("git init")
         run_command("git branch -M main")
     
     # 3. Add Files
-    print("➕ Adding files to staging...")
-    run_command("git add cinematography_assistant.py prompt_templates.json requirements.txt .agent/skills")
+    print("Adding files to staging...")
+    run_command("git add cinematography_assistant.py prompt_templates.json requirements.txt")
     
     # 4. Commit
-    commit_msg = input("📝 Enter commit message (default: 'Update assistant from laptop'): ") or "Update assistant from laptop"
+    commit_msg = input("Enter commit message (default: 'Update Assistant V2.7'): ") or "Update Assistant V2.7"
     run_command(f'git commit -m "{commit_msg}"')
     
-    # 5. Push (Requires Remote Setup)
-    remote_check = run_command("git remote -v")
-    if not remote_check:
-        print("\n⚠️ No remote repository configured!")
-        repo_url = input("🔗 Please enter your GitHub Repository URL: ")
+    # 5. Remote Check
+    remote_exists = run_command("git remote -v")
+    if not remote_exists:
+        repo_url = input("Enter GitHub Repository URL: ")
         if repo_url:
             run_command(f"git remote add origin {repo_url}")
-            print(f"✅ Remote 'origin' added: {repo_url}")
-        else:
-            print("❌ Push cancelled. Configure remote manually with 'git remote add origin <url>'.")
-            return
-
-    print("\n🚀 Pushing to Cloud Hub...")
-    push_result = run_command("git push -u origin main")
-    
-    if push_result is not None:
-        print("\n✨ SUCCESS: Your assistant is now synced with the Hub!")
-        print("💡 The Cloud Hub should auto-redeploy in a few seconds.")
+            run_command("git push -u origin main")
     else:
-        print("\n❌ FAILED to push. Check your internet connection or GitHub permissions.")
+        print("Starting synchronization...")
+        run_command("git push")
+        print("Synchronization completed successfully!")
 
 if __name__ == "__main__":
     main()
