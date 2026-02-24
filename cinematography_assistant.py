@@ -161,6 +161,37 @@ def generate_image_openai(prompt):
         st.error(f"Error con OpenAI: {str(e)}")
         return None
 
+def generate_gpt5_intelligence(system_prompt, user_input):
+    """Lógica avanzada usando el nuevo API Responses de OpenAI y GPT-5.2"""
+    try:
+        if "OPENAI_API_KEY" not in st.secrets:
+            st.error("Falta OPENAI_API_KEY para activar GPT-5.2.")
+            return None
+        
+        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        # Usando la nueva sintaxis GPT-5.2 Responses API
+        response = client.responses.create(
+            model="gpt-5.2",
+            input=f"SYSTEM: {system_prompt}\nUSER: {user_input}"
+        )
+        return response.output_text
+    except Exception as e:
+        st.warning(f"GPT-5.2 no disponible o error: {str(e)}. Reintentando con GPT-4o...")
+        try:
+            # Fallback a chat.completions si el API Responses falla o no está soportado en la versión local
+            client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_input}
+                ]
+            )
+            return response.choices[0].message.content
+        except Exception as e2:
+            st.error(f"Error total en inteligencia: {str(e2)}")
+            return None
+
 def generate_image_gemini(prompt):
     try:
         if "GOOGLE_API_KEY" not in st.secrets:
@@ -257,6 +288,9 @@ def main():
     tabs = st.tabs(["🎮 Panel de Control", "📜 Analizador de Guion", "🎵 Ritmo & Audio (Storyboard)"])
     
     with st.sidebar:
+        st.write("### 🧠 Inteligencia Maestra")
+        use_gpt5 = st.toggle("Activar Cerebro GPT-5.2", value=True, help="Usa el razonamiento avanzado de GPT-5.2 para analizar el guion y las tomas.")
+        
         st.write("### 🎥 Cámara y Estilo")
         director_choice = st.selectbox("Firma Visual del Director:", list(templates['director_styles'].keys()))
         lens_choice = st.selectbox("Características del Lente:", list(templates['lens_presets'].keys()))
@@ -373,8 +407,19 @@ def main():
             if not script_text or not parser_char:
                 st.error("Por favor, proporciona el texto del guion e identidad del personaje.")
             else:
-                # Simple logic to simulate "parsing" key moments (split by sentences or common script markers)
-                moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10]
+                if use_gpt5:
+                    with st.spinner("GPT-5.2 analizando subtexto y narrativa visual..."):
+                        system_instr = "Eres un Director de Fotografía experto. Analiza el guion y devuelve UNA LISTA de hasta 5 momentos clave. Para cada momento, describe la acción en una frase. Sé técnico y preciso."
+                        analysis = generate_gpt5_intelligence(system_instr, f"Guion: {script_text}")
+                        if analysis:
+                            # Parsear la lista (asumiendo formato de lista)
+                            moments = [m.strip() for m in analysis.split('\n') if len(m.strip()) > 5][:5]
+                        else:
+                            moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10]
+                else:
+                    # Simple logic to simulate "parsing" key moments (split by sentences or common script markers)
+                    moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10]
+                
                 if not moments: moments = [script_text[:100]] # Fallback
                 
                 # Assign angles based on keywords or cycle
