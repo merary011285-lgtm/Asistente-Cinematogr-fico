@@ -165,41 +165,53 @@ def generate_image_openai(prompt):
             st.error(f"Error con OpenAI: {error_msg}")
         return None
 
-def generate_gpt5_intelligence(system_prompt, user_input):
-    """Lógica avanzada usando el nuevo API Responses de OpenAI y GPT-5.2"""
+def generate_intelligence(system_prompt, user_input, engine_choice="GPT-5.2"):
+    """Lógica multicanal para análisis y razonamiento"""
     try:
-        if "OPENAI_API_KEY" not in st.secrets:
-            st.error("Falta OPENAI_API_KEY para activar GPT-5.2.")
-            return None
-        
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-        # Usando la nueva sintaxis GPT-5.2 Responses API
-        response = client.responses.create(
-            model="gpt-5.2",
-            input=f"SYSTEM: {system_prompt}\nUSER: {user_input}"
-        )
-        return response.output_text
-    except Exception as e:
-        error_msg = str(e)
-        if "billing_hard_limit_reached" in error_msg or "insufficient_quota" in error_msg:
-            st.error("⚠️ **Créditos Agotados en OpenAI.**\n\nTu cuenta de OpenAI ha alcanzado su límite de gasto. El 'Cerebro GPT-5.2' no puede procesar el guion en este momento.\n\n**Solución**: Desactiva el interruptor 'Activar Cerebro GPT-5.2' en la barra lateral para usar la lógica local del asistente hasta que recargues tu cuenta.")
-            return None
-        
-        st.warning(f"GPT-5.2 no disponible o error: {error_msg}. Reintentando con GPT-4o...")
-        try:
-            # Fallback a chat.completions si el API Responses falla o no está soportado en la versión local
+        if engine_choice == "GPT-5.2":
+            if "OPENAI_API_KEY" not in st.secrets:
+                st.error("Falta OPENAI_API_KEY para activar GPT-5.2.")
+                return None
+            client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+            response = client.responses.create(
+                model="gpt-5.2",
+                input=f"SYSTEM: {system_prompt}\nUSER: {user_input}"
+            )
+            return response.output_text
+            
+        elif engine_choice == "GPT-4o-mini (Fast)":
+            if "OPENAI_API_KEY" not in st.secrets:
+                st.error("Falta OPENAI_API_KEY.")
+                return None
             client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_input}
                 ]
             )
             return response.choices[0].message.content
-        except Exception as e2:
-            st.error(f"Error total en inteligencia: {str(e2)}")
-            return None
+            
+        elif engine_choice == "Gemini Flash (Free)":
+            if "GOOGLE_API_KEY" not in st.secrets:
+                st.error("Falta GOOGLE_API_KEY.")
+                return None
+            client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
+            # Usando el modelo Flash para análisis de texto rápido/gratis
+            response = client.models.generate_content(
+                model='gemini-1.5-flash',
+                contents=f"{system_prompt}\n\n{user_input}"
+            )
+            return response.text
+            
+    except Exception as e:
+        error_msg = str(e)
+        if "billing_hard_limit_reached" in error_msg or "insufficient_quota" in error_msg:
+            st.error("⚠️ Límite de facturación alcanzado en el proveedor seleccionado.")
+        else:
+            st.error(f"Error en {engine_choice}: {error_msg}")
+        return None
 
 def generate_image_gemini(prompt):
     try:
@@ -321,7 +333,7 @@ def main():
     
     with st.sidebar:
         st.write("### 🧠 Inteligencia Maestra")
-        use_gpt5 = st.toggle("Activar Cerebro GPT-5.2", value=True, help="Usa el razonamiento avanzado de GPT-5.2 para analizar el guion y las tomas.")
+        intel_choice = st.selectbox("Motor de Razonamiento:", ["GPT-5.2", "GPT-4o-mini (Fast)", "Gemini Flash (Free)"], index=0)
         
         st.write("### 🎥 Cámara y Estilo")
         director_choice = st.selectbox("Firma Visual del Director:", list(templates['director_styles'].keys()))
@@ -439,10 +451,10 @@ def main():
             if not script_text or not parser_char:
                 st.error("Por favor, proporciona el texto del guion e identidad del personaje.")
             else:
-                if use_gpt5:
-                    with st.spinner("GPT-5.2 analizando subtexto y narrativa visual..."):
+                if intel_choice:
+                    with st.spinner(f"{intel_choice} analizando subtexto y narrativa visual..."):
                         system_instr = "Eres un Director de Fotografía experto. Analiza el guion y devuelve UNA LISTA de hasta 5 momentos clave. Para cada momento, describe la acción en una frase. Sé técnico y preciso."
-                        analysis = generate_gpt5_intelligence(system_instr, f"Guion: {script_text}")
+                        analysis = generate_intelligence(system_instr, f"Guion: {script_text}", intel_choice)
                         if analysis:
                             # Parsear la lista (asumiendo formato de lista)
                             moments = [m.strip() for m in analysis.split('\n') if len(m.strip()) > 5][:5]
