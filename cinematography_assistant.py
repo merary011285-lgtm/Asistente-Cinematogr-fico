@@ -1,11 +1,9 @@
 import streamlit as st
 import json
 import os
-import replicate
 from openai import OpenAI
-import google.generativeai as st_genai # Older library for other uses if any
-from google import genai # New library for Imagen 3
-import fal_client
+import google.generativeai as st_genai 
+from google import genai 
 import librosa
 import numpy as np
 import tempfile
@@ -54,9 +52,48 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def load_templates():
-    with open('prompt_templates.json', 'r') as f:
-        return json.load(f)
+# Prompt templates embedded directly to remove external JSON dependency
+TEMPLATES = {
+  "director_styles": {
+    "Épico / Escala Masiva (Nolan)": "Grand scale architectures, visceral realism, physical practical effects, vast landscapes, 1.43:1 full IMAX height.",
+    "Atmosférico / Ciencia Ficción (Villeneuve)": "Atmospheric fog, silhouette lighting, brutalist architecture, monochromatic or bi-color palettes, 1.90:1 digital IMAX.",
+    "Roger Deakins (Naturalista)": "Motivated naturalistic lighting, muslin bounce, mid-wide 35mm focal lengths, extreme contrast precision, sharp clean textures.",
+    "Emmanuel Lubezki (Inmersivo)": "Natural light only (magic hour), ultra-wide 12-24mm, immersive long takes, zero grain, visceral proximity to subject.",
+    "Robert Richardson (Gótico/Halo)": "Strong rim lighting, HALO top-down effect, blooming highlights, high color contrast, Panavision anamorphic texture.",
+    "Greig Fraser (Táctil/LED)": "Chiaroscuro (shadow play), digital-native textures, LED-screen ambient light, shallow depth of field, epic scope.",
+    "Steven Spielberg (Bypass/Haze)": "Janusz Kaminski style, bleach bypass ENR process, desaturated color, heavy grain, overlit blooming highlights, hazy diffuse lighting.",
+    "Ridley Scott (Épico Desaturado)": "Dariusz Wolski style, huge epic scale, painterly desaturated tones, natural available light emphasis, realistic documentary-style immersion.",
+    "Estilo Documental Rudo": "Handheld 65mm feel, natural lighting, sweat and dirt detail, muted colors, high texture."
+  },
+  "lens_presets": {
+    "Panavision Ultra 70 (Anamórfico)": "2x squeeze, intense oval bokeh, horizontal blue lens flares, sharp center with edge falloff.",
+    "IMAX Hasselblad (Esférico)": "Tack sharp from corner to corner, zero distortion, deep depth of field, 15/70mm resolution.",
+    "Cooke Anamórfico Vintage": "Warm tones, subtle lens flares, painterly bokeh, organic texture.",
+    "Arri Alexa 65 (Digital Gran Formato)": "Ultra clean, massive dynamic range, modern glass characteristics."
+  },
+  "film_stocks": [
+    "Kodak Vision3 500T (Poca luz, tonos fríos)",
+    "Kodak Vision3 250D (Luz día, natural)",
+    "Kodak Eastman Double-X (Blanco y Negro)",
+    "Fuji Eterna (Alta saturación, verdes/azules profundos)"
+  ],
+  "shot_angles": {
+    "Plano Gran General (EWS)": "Establishing the vast environment, character is small in frame, 1.43:1 ratio.",
+    "Plano General (WS)": "Full body visible, clear relationship with environment.",
+    "Plano Medio (MS)": "Waist up, focusing on interaction and wardrobe detail.",
+    "Primer Plano (CU)": "Tight on face, shallow depth of field, intense 70mm skin texture.",
+    "Ángulo Contrapicado (Heroico)": "Looking up at character, making them appear powerful.",
+    "Cenital / Vista de Pájaro": "Looking down, showing isolation or objective perspective.",
+    "Ángulo Holandés (Tensión)": "Tilted horizon, creating tension and unease."
+  },
+  "color_palettes": {
+    "Clásico Teal & Orange": "Cool shadows, warm skin tones, high dynamic range pop.",
+    "Desaturado / Bleach Bypass": "High contrast, gritty, muted colors, metallic feel.",
+    "Tecnicolor Heredado": "Deep reds and blues, high saturation, nostalgic 1950s epic feel.",
+    "Monocromo (Double-X)": "Hyper-detailed black and white, deep blacks, glowing silver highlights.",
+    "Neón Noir": "Vibrant pinks and cyans against deep darkness."
+  }
+}
 
 def generate_prompt(scene, character, wardrobe, color, director, lens, stock, angle_name, angle_desc, engine):
     # Mapping técnico
@@ -118,53 +155,6 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, an
     }
     return json_output, full_prompt, diagram
 
-def generate_image_replicate(prompt):
-    try:
-        if "REPLICATE_API_TOKEN" not in st.secrets:
-            st.error("Falta REPLICATE_API_TOKEN en los secretos de Streamlit o variables de entorno.")
-            return None
-        
-        # Usando Flux.1 [dev] por defecto para calidad cinematográfica
-        output = replicate.run(
-            "black-forest-labs/flux-dev",
-            input={
-                "prompt": prompt,
-                "aspect_ratio": "16:9",
-                "guidance_scale": 3.5,
-                "num_inference_steps": 28
-            }
-        )
-        # Flux suele devolver una lista de URLs o un iterador
-        if isinstance(output, list):
-            return output[0]
-        return output
-    except Exception as e:
-        st.error(f"Error con Replicate: {str(e)}")
-        return None
-
-def generate_image_openai(prompt):
-    try:
-        if "OPENAI_API_KEY" not in st.secrets:
-            st.error("Falta OPENAI_API_KEY en los secretos de Streamlit.")
-            return None
-        
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-        response = client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size="1024x1024",
-            quality="hd",
-            n=1,
-        )
-        return response.data[0].url
-    except Exception as e:
-        error_msg = str(e)
-        if "billing_hard_limit_reached" in error_msg or "insufficient_quota" in error_msg:
-            st.error("⚠️ **Límite de Facturación en OpenAI Alcanzado.**\n\nNo te preocupes, puedes seguir trabajando usando los otros motores:\n- Selecciona **🔥 Gemini (Imagen 3)** (si tienes créditos de Google).\n- Selecciona **🔥 Fal.ai (Flux)** (si tienes créditos en Fal.ai).")
-        else:
-            st.error(f"Error con OpenAI: {error_msg}")
-        return None
-
 def generate_intelligence(system_prompt, user_input, engine_choice="GPT-5.2"):
     """Lógica multicanal para análisis y razonamiento"""
     try:
@@ -211,63 +201,6 @@ def generate_intelligence(system_prompt, user_input, engine_choice="GPT-5.2"):
             st.error("⚠️ Límite de facturación alcanzado en el proveedor seleccionado.")
         else:
             st.error(f"Error en {engine_choice}: {error_msg}")
-        return None
-
-def generate_image_gemini(prompt):
-    try:
-        if "GOOGLE_API_KEY" not in st.secrets:
-            st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
-            return None
-        
-        # Usando la nueva librería google-genai para Imagen 3 (Ojo: es plural generate_images)
-        client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
-        response = client.models.generate_images(
-            model='imagen-3.0-generate-001',
-            prompt=prompt,
-            config={
-                'number_of_images': 1,
-                'aspect_ratio': '16:9',
-                'safety_filter_level': 'block_only_high'
-            }
-        )
-        # La respuesta en google-genai contiene una lista de imágenes
-        if response.generated_images:
-            # En la versión más reciente, es generated_images[0].image_url o .image_resource.url
-            try:
-                return response.generated_images[0].image_url
-            except AttributeError:
-                return response.generated_images[0].image_resource.url
-        return None
-    except Exception as e:
-        # Fallback o error detallado
-        st.error(f"Error con Gemini Imagen 3: {str(e)}")
-        # Intentar con st_genai si es necesario, pero Imagen 3 es mejor en google-genai
-        return None
-
-def generate_image_fal(prompt):
-    try:
-        if "FAL_KEY" not in st.secrets:
-            st.error("Falta FAL_KEY en los secretos de Streamlit.")
-            return None
-        
-        # Usamos Flux.1 [dev] via fal-client (el famoso 'Flow')
-        handler = fal_client.submit(
-            "fal-ai/flux/dev",
-            arguments={
-                "prompt": prompt,
-                "image_size": "landscape_16_9"
-            },
-        )
-        result = handler.get()
-        if "images" in result and result["images"]:
-            return result["images"][0]["url"]
-        return None
-    except Exception as e:
-        error_msg = str(e)
-        if "Exhausted balance" in error_msg or "locked" in error_msg.lower():
-            st.error("⚠️ **Saldo Agotado en Fal.ai.**\n\nTu cuenta de Fal.ai no tiene créditos suficientes.\n\n**Solución**: \n- Selecciona **🔥 Gemini (Imagen 3)** (Google).\n- Selecciona **🔥 Replicate (Flux)** (si tienes saldo en Replicate).")
-        else:
-            st.error(f"Error con Fal.ai: {error_msg}")
         return None
 
 def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type, duration_seconds=0):
@@ -329,10 +262,10 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type, durat
         return None
 
 def main():
-    templates = load_templates()
+    templates = TEMPLATES
     
     st.title("🎬 Asistente Cinematográfico PRO V2: IMAX Hub")
-    st.subheader("Firmas de Directores Maestros y Optimización Multi-Motor")
+    st.subheader("Optimización de Prompts Cinematográficos (Sin Generadores de Imágenes)")
     
     tabs = st.tabs(["🎮 Panel de Control", "📜 Analizador de Guion", "🎵 Ritmo & Audio (Storyboard)"])
     
@@ -341,10 +274,16 @@ def main():
         intel_choice = st.selectbox("Motor de Razonamiento:", ["GPT-5.2", "GPT-4o-mini (Fast)", "Gemini Flash (Free)"], index=0)
         
         st.write("### 🎥 Cámara y Estilo")
-        director_choice = st.selectbox("Firma Visual del Director:", list(templates['director_styles'].keys()))
-        lens_choice = st.selectbox("Características del Lente:", list(templates['lens_presets'].keys()))
+        director_style_keys = list(templates['director_styles'].keys())
+        director_choice = st.selectbox("Firma Visual del Director:", director_style_keys)
+        
+        lens_presets_keys = list(templates['lens_presets'].keys())
+        lens_choice = st.selectbox("Características del Lente:", lens_presets_keys)
+        
         stock_choice = st.selectbox("Tipo de Película (Stock):", templates['film_stocks'])
-        color_choice = st.selectbox("Paleta de Color:", list(templates['color_palettes'].keys()))
+        
+        color_palettes_keys = list(templates['color_palettes'].keys())
+        color_choice = st.selectbox("Paleta de Color:", color_palettes_keys)
         
         st.write("### 🚀 Motor de IA Destino")
         engine_choice = st.selectbox("Optimizar para:", ["Meta AI / Grok", "Midjourney", "DALL-E 3", "Qwen / Flux"])
@@ -359,7 +298,8 @@ def main():
             wardrobe_desc = st.text_input("Detalles del Vestuario:", placeholder="Traje de vuelo desgastado con insignias remendadas.", key="wardrobe_creator")
             
             st.write("### 📸 Ángulos de Cámara")
-            selected_angles = st.multiselect("Selecciona ángulos para la lista de tomas:", list(templates['shot_angles'].keys()), default=["Plano General (WS)", "Primer Plano (CU)"], key="angles_creator")
+            shot_angles_keys = list(templates['shot_angles'].keys())
+            selected_angles = st.multiselect("Selecciona ángulos para la lista de tomas:", shot_angles_keys, default=["Plano General (WS)", "Primer Plano (CU)"], key="angles_creator")
 
             if st.button("🎬 ACCIÓN: Generar Lista de Tomas"):
                 if not scene_desc or not char_desc:
@@ -389,56 +329,10 @@ def main():
                     with st.expander(f"Toma {i+1}: {json_res['tipo_de_toma']} ({engine_choice})", expanded=(i==0)):
                         st.write("#### 🚀 Prompt Optimizado (Copia esto)")
                         st.text_area(f"Prompt {i+1}:", value=prompt_res, height=120, key=f"p_v2_{i}")
-                        
-                        st.write("#### 💡 Esquema de Iluminación (Diagrama)")
-                        st.code(diag_res, language="mermaid")
-                        st.info("Copia el código de arriba en un editor Mermaid para ver el diagrama visual.")
-                        
-                        st.write("#### 📝 Metadatos JSON")
-                        st.code(json.dumps(json_res, indent=2, ensure_ascii=False), language="json")
-                        
                         st.write("---")
-                        st.write("#### 🎨 Generación de Imagen Directa")
-                        
-                        btn_key_base = f"gen_btn_{i}_{engine_choice}"
-                        
-                        # Detectamos qué llaves están presentes
-                        has_openai = "OPENAI_API_KEY" in st.secrets
-                        has_gemini = "GOOGLE_API_KEY" in st.secrets
-                        has_fal = "FAL_KEY" in st.secrets
-                        has_replicate = "REPLICATE_API_TOKEN" in st.secrets
-                        
-                        if not any([has_openai, has_gemini, has_fal, has_replicate]):
-                            st.warning("⚠️ No se detectaron llaves de API. Configura `.streamlit/secrets.toml` para habilitar la generación.")
-                        else:
-                            st.info("Elige el proveedor según tus créditos disponibles:")
-                            cols = st.columns(4)
-                            
-                            if has_openai:
-                                if cols[0].button("🚀 DALL-E 3", key=f"{btn_key_base}_oa"):
-                                    with st.spinner("Generando en DALL-E 3..."):
-                                        img_url = generate_image_openai(prompt_res)
-                                        if img_url: st.image(img_url, caption="Resultado DALL-E 3")
-                            
-                            if has_gemini:
-                                if cols[1].button("♊ Gemini/Imagen", key=f"{btn_key_base}_gem"):
-                                    with st.spinner("Generando en Imagen 3..."):
-                                        img_url = generate_image_gemini(prompt_res)
-                                        if img_url: st.image(img_url, caption="Resultado Imagen 3")
-
-                            if has_fal:
-                                if cols[2].button("🔥 Fal.ai (Flux)", key=f"{btn_key_base}_fal"):
-                                    with st.spinner("Generando en Fal.ai (Flux)..."):
-                                        img_url = generate_image_fal(prompt_res)
-                                        if img_url: st.image(img_url, caption="Resultado Fal/Flux")
-
-                            if has_replicate:
-                                if cols[3].button("🌀 Replicate", key=f"{btn_key_base}_repl"):
-                                    with st.spinner("Generando en Replicate..."):
-                                        img_url = generate_image_replicate(prompt_res)
-                                        if img_url: st.image(img_url, caption="Resultado Replicate")
+                        # Image generation removed per user request
                 
-                st.info("💡 **Tip de Fase 2:** El prompt ahora incluye modificadores técnicos específicos para el motor de IA seleccionado.")
+                st.info("💡 **Tip:** Copia el prompt en tu generador de imágenes favorito (Midjourney, DALL-E, Flux, etc.)")
             else:
                 st.write("Completa los detalles y elige un Director Maestro para generar tus tomas.")
 
@@ -464,18 +358,18 @@ def main():
                             # Parsear la lista (asumiendo formato de lista)
                             moments = [m.strip() for m in analysis.split('\n') if len(m.strip()) > 5][:5]
                         else:
-                            moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10]
+                            moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10][:5]
                 else:
-                    # Simple logic to simulate "parsing" key moments (split by sentences or common script markers)
-                    moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10]
+                    # Simple logic to simulate "parsing" key moments
+                    moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10][:5]
                 
                 if not moments: moments = [script_text[:100]] # Fallback
                 
                 # Assign angles based on keywords or cycle
-                angle_list = list(templates['shot_angles'].keys())
+                shot_angles_keys_list = list(templates['shot_angles'].keys())
                 results = []
-                for i, moment in enumerate(moments[:5]): # Limit to first 5 moments for demo
-                    angle = angle_list[i % len(angle_list)]
+                for i, moment in enumerate(moments): 
+                    angle = shot_angles_keys_list[i % len(shot_angles_keys_list)]
                     json_res, prompt_res, diag_res = generate_prompt(
                         moment, 
                         parser_char,
@@ -497,27 +391,25 @@ def main():
                 with st.expander(f"Momento de Escena {i+1}: {json_res['tipo_de_toma']}", expanded=(i==0)):
                     st.write(f"**Acción:** *{json_res['descripcion']}*")
                     
-                    # Botón de carga rápida (Solicitado por el usuario)
-                    if st.button(f"📋 Cargar Toma {i+1} en Panel (Pega esto)", key=f"btn_copy_{i}"):
+                    # Botón de carga rápida
+                    if st.button(f"📋 Cargar Toma {i+1} en Panel", key=f"btn_copy_{i}"):
                         st.session_state['scene_creator'] = json_res['descripcion']
-                        st.session_state['char_creator'] = json_res['personaje']
-                        st.session_state['wardrobe_creator'] = json_res['vestuario']
+                        st.session_state['char_creator'] = parser_char
+                        st.session_state['wardrobe_creator'] = parser_wardrobe
                         st.success(f"¡Toma {i+1} cargada satisfactoriamente! Ve a la pestaña 'Panel de Control'.")
                         st.rerun()
 
                     st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
-                    st.code(diag_res, language="mermaid")
 
     with tabs[2]:
         st.write("### 🎵 Generador de Storyboard por Ritmo")
-        st.info("Sube una canción o audio para generar un storyboard sincronizado con el tempo y la letra.")
+        st.info("Sube una canción o audio para generar un storyboard sincronizado con el tempo.")
         
         uploaded_audio = st.file_uploader("Sube tu archivo de audio (mp3, wav)", type=["mp3", "wav"])
         audio_char = st.text_input("Protagonista para el Storyboard:", placeholder="Un cosmonauta perdido en Marte")
         
         if uploaded_audio and st.button("🔥 GENERAR STORYBOARD SINCRONIZADO"):
             with st.spinner("Analizando ritmo y narrativa..."):
-                # Save temp file for processing
                 with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_audio.name[uploaded_audio.name.rfind('.'):]) as tmp:
                     tmp.write(uploaded_audio.getbuffer())
                     tmp_path = tmp.name
@@ -535,9 +427,7 @@ def main():
                     
                     if storyboard_text:
                         st.session_state['audio_storyboard'] = storyboard_text
-                        st.session_state['audio_bpm'] = tempo
                 finally:
-                    # Clean up
                     if os.path.exists(tmp_path):
                         os.remove(tmp_path)
         
