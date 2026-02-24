@@ -292,7 +292,7 @@ def main():
     
     with st.sidebar:
         st.write("### 🧠 Inteligencia Maestra")
-        intel_choice = st.selectbox("Motor de Razonamiento:", ["GPT-5.2", "GPT-4o-mini (Fast)", "Gemini Flash (Free)"], index=0)
+        intel_choice = st.selectbox("Motor de Razonamiento:", ["GPT-4o-mini (Fast)", "GPT-5.2", "Gemini Flash (Free)"], index=0)
         
         st.write("### 🎥 Cámara y Estilo")
         director_style_keys = list(templates['director_styles'].keys())
@@ -355,10 +355,9 @@ def main():
                         st.write("#### 🚀 Prompt Optimizado")
                         st.text_area(f"Prompt {i+1}:", value=prompt_res, height=120, key=f"p_v2_{i}")
                         
-                        # Copy button implementation
-                        if st.button(f"📋 Copiar Prompt {i+1}", key=f"copy_v2_{i}"):
-                            st.write(f'<script>navigator.clipboard.writeText("{prompt_res}");</script>', unsafe_allow_html=True)
-                            st.success("¡Copiado al portapapeles!")
+                        # Optimized prompt display with built-in copy button
+                        st.code(prompt_res, language=None)
+                        st.info("💡 Haz clic en el botón de la esquina superior derecha del cuadro gris para copiar.")
 
                         st.write("---")
                         # Image generation removed per user request
@@ -433,10 +432,8 @@ def main():
 
                     st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
                     
-                    # Copy button for script analyzer as well
-                    if st.button(f"📋 Copiar Prompt {i+1}", key=f"cp_script_{i}"):
-                        st.write(f'<script>navigator.clipboard.writeText("{prompt_res}");</script>', unsafe_allow_html=True)
-                        st.success("¡Copiado al portapapeles!")
+                    # Copy block for script analyzer
+                    st.code(prompt_res, language=None)
 
     with tabs[2]:
         st.write("### 🎵 Generador de Storyboard por Ritmo")
