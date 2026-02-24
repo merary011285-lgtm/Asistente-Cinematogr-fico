@@ -81,6 +81,10 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, an
         diagram += "    SUN[Fuente de Luz Natural] --> SUB\n    BOUNCE[Rebotador Muslin] --> SUB"
     elif "Richardson" in director:
         diagram += "    HALO[Luz Halo Cenital] --> SUB\n    BACK[Contraluz de Recorte] --> SUB"
+    elif "Spielberg" in director:
+        diagram += "    BLOOM[Luz Sobreexpuesta (Haze)] --> SUB\n    BACK[Contraluz Fuerte] --> SUB"
+    elif "Ridley Scott" in director:
+        diagram += "    FIRE[Luz de Fuego/Velas] --> SUB\n    SIDE[Luz Lateral Natural] --> SUB"
     else:
         diagram += "    KEY[Luz Principal] --> SUB\n    FILL[Luz de Relleno] --> SUB\n    RIM[Luz de Recorte] --> SUB"
 
