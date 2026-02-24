@@ -207,9 +207,9 @@ def generate_image_gemini(prompt):
             st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
             return None
         
-        # Usando la nueva librería google-genai para Imagen 3
+        # Usando la nueva librería google-genai para Imagen 3 (Ojo: es plural generate_images)
         client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
-        response = client.models.generate_image(
+        response = client.models.generate_images(
             model='imagen-3.0-generate-001',
             prompt=prompt,
             config={
@@ -218,9 +218,13 @@ def generate_image_gemini(prompt):
                 'safety_filter_level': 'block_none'
             }
         )
-        # La respuesta contiene objetos de imagen con bytes o URLs
+        # La respuesta en google-genai contiene una lista de imágenes
         if response.generated_images:
-            return response.generated_images[0].image_resource.url 
+            # En la versión más reciente, es generated_images[0].image_url o .image_resource.url
+            try:
+                return response.generated_images[0].image_url
+            except AttributeError:
+                return response.generated_images[0].image_resource.url
         return None
     except Exception as e:
         # Fallback o error detallado
