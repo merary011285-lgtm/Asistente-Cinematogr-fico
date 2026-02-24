@@ -216,11 +216,12 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe):
             st.error("Falta GOOGLE_API_KEY en los secretos de Streamlit.")
             return None
         
-        st_genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        model = st_genai.GenerativeModel("gemini-1.5-flash")
+        # Usando la nueva librería google-genai para mayor robustez
+        client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
         
-        # Upload audio to Gemini
-        audio_file = st_genai.upload_file(path=audio_file_path)
+        # Subir archivo usando el nuevo SDK (Google Gen AI)
+        with open(audio_file_path, "rb") as f:
+            audio_file = client.files.upload(file=f)
         
         prompt = f"""
         Analyze this audio and create a detailed cinematographic storyboard.
@@ -235,13 +236,16 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe):
         - Mood/Atmosphere (English)
         
         Maintain absolute visual consistency for the character across all shots.
-        Format the output clearly.
+        Format the output clearly using markdown.
         """
         
-        response = model.generate_content([prompt, audio_file])
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=[prompt, audio_file]
+        )
         return response.text
     except Exception as e:
-        st.error(f"Error analizando audio con Gemini: {str(e)}")
+        st.error(f"Error analizando audio con Gemini (SDK GenAI): {str(e)}")
         return None
 
 def main():
