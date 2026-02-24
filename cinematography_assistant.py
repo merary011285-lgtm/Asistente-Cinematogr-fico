@@ -419,7 +419,9 @@ def main():
                     # 1. Librosa BPM Analysis
                     y, sr = librosa.load(tmp_path)
                     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-                    st.success(f"Tempo Detectado: {round(float(tempo), 1)} BPM")
+                    # Convertimos a scalar si es un array (común en nuevas versiones de librosa)
+                    bpm = float(np.mean(tempo))
+                    st.success(f"Tempo Detectado: {round(bpm, 1)} BPM")
                     
                     # 2. Gemini Analysis
                     storyboard_text = analyze_audio_with_gemini(tmp_path, audio_char, director_choice)
