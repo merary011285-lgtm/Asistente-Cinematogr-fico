@@ -1,6 +1,8 @@
 import streamlit as st
 import json
 import os
+import replicate
+from openai import OpenAI
 
 # Set page config for a premium look
 st.set_page_config(
@@ -110,6 +112,49 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, an
     }
     return json_output, full_prompt, diagram
 
+def generate_image_replicate(prompt):
+    try:
+        if "REPLICATE_API_TOKEN" not in st.secrets:
+            st.error("Falta REPLICATE_API_TOKEN en los secretos de Streamlit o variables de entorno.")
+            return None
+        
+        # Usando Flux.1 [dev] por defecto para calidad cinematográfica
+        output = replicate.run(
+            "black-forest-labs/flux-dev",
+            input={
+                "prompt": prompt,
+                "aspect_ratio": "16:9",
+                "guidance_scale": 3.5,
+                "num_inference_steps": 28
+            }
+        )
+        # Flux suele devolver una lista de URLs o un iterador
+        if isinstance(output, list):
+            return output[0]
+        return output
+    except Exception as e:
+        st.error(f"Error con Replicate: {str(e)}")
+        return None
+
+def generate_image_openai(prompt):
+    try:
+        if "OPENAI_API_KEY" not in st.secrets:
+            st.error("Falta OPENAI_API_KEY en los secretos de Streamlit.")
+            return None
+        
+        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            quality="hd",
+            n=1,
+        )
+        return response.data[0].url
+    except Exception as e:
+        st.error(f"Error con OpenAI: {str(e)}")
+        return None
+
 def main():
     templates = load_templates()
     
@@ -175,6 +220,28 @@ def main():
                         
                         st.write("#### 📝 Metadatos JSON")
                         st.code(json.dumps(json_res, indent=2, ensure_ascii=False), language="json")
+                        
+                        st.write("---")
+                        st.write("#### 🎨 Generación de Imagen Directa")
+                        gen_col1, gen_col2 = st.columns(2)
+                        
+                        btn_key = f"gen_btn_{i}_{engine_choice}"
+                        
+                        if engine_choice == "Midjourney" or engine_choice == "Qwen / Flux":
+                             if gen_col1.button("✨ Generar con FLUX (Replicate)", key=btn_key):
+                                with st.spinner("Generando imagen maestra en Flux..."):
+                                    img_url = generate_image_replicate(prompt_res)
+                                    if img_url:
+                                        st.image(img_url, caption=f"Resultado Flux: {json_res['tipo_de_toma']}")
+                        
+                        elif engine_choice == "DALL-E 3":
+                            if gen_col1.button("🚀 Generar con DALL-E 3", key=btn_key):
+                                with st.spinner("Generando imagen en DALL-E 3..."):
+                                    img_url = generate_image_openai(prompt_res)
+                                    if img_url:
+                                        st.image(img_url, caption=f"Resultado DALL-E 3: {json_res['tipo_de_toma']}")
+                        else:
+                            st.warning("Selecciona 'Midjourney/Flux' o 'DALL-E 3' en el motor para habilitar la generación directa.")
                 
                 st.info("💡 **Tip de Fase 2:** El prompt ahora incluye modificadores técnicos específicos para el motor de IA seleccionado.")
             else:
