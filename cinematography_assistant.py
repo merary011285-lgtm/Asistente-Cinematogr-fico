@@ -139,13 +139,16 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, mo
     elif engine == "DALL-E 3":
         engine_suffix = " Wide-screen cinematic mode, hyper-photorealistic, maintain exact visual continuity with previous frames."
 
-    # Prompt final (Totalmente en Inglés)
-    full_prompt = (
-        f"{angle_name}: {scene}. {angle_desc}. Camera Movement: {movement}. "
+    # Prompt final de Imagen (Sin movimiento)
+    image_prompt = (
+        f"{angle_name}: {scene}. {angle_desc}. "
         f"{consistency_block} {director}. {technical_details}. "
         f"Key visual traits: {'oval bokeh, horizontal lens flares, ' if is_anamorphic else ''}"
         f"extreme detail, naturalistic grain, high dynamic range, 12k resolution texture, visceral atmosphere.{engine_suffix}"
     )
+
+    # Prompt de Movimiento de Cámara (Específico)
+    movement_prompt = f"CAMERA MOVEMENT: {movement}. Technical execution: {angle_name} logic. Ensure smooth cinematic flow."
     
     # Lógica de Iluminación para Mermaid
     diagram = f"graph TD\n    CAM[Cámara IMAX] --- SUB[({character})]\n"
@@ -179,9 +182,10 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, mo
         },
         "intencion_director": director,
         "esquema_iluminacion": diagram,
-        "prompt_final": full_prompt
+        "prompt_imagen": image_prompt,
+        "prompt_movimiento": movement_prompt
     }
-    return json_output, full_prompt, diagram
+    return json_output, image_prompt, movement_prompt, diagram
 
 def generate_intelligence(system_prompt, user_input, engine_choice="GPT-5.2"):
     """Lógica multicanal para análisis y razonamiento"""
@@ -259,11 +263,12 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type, durat
         
         MANDATORY STEP 2: STORYBOARD SEQUENCE
         Create a sequence of shots covering the entire {duration_seconds}s.
-        For each shot, provide:
-        - Timestamp (e.g., 0:05)
-        - Scene Action (Technical English)
-        - Shot Type & Angle (Technical English)
-        - Mood/Atmosphere
+        For each shot, provide exactly:
+        1. Timestamp (e.g., 0:05)
+        2. Scene Action (English)
+        3. IMAGE PROMPT: Detailed visual description (No camera movement here)
+        4. MOVEMENT PROMPT: Specific technical camera movement instruction
+        5. Mood/Atmosphere
         
         FORMATTING RULE:
         Start your response with a JSON-like block for the PRODUCTION BIBLE so I can parse it, then follow with the Markdown Storyboard.
@@ -363,33 +368,34 @@ def main():
                 else:
                     results = []
                     for angle in selected_angles:
-                        json_res, prompt_res, diag_res = generate_prompt(
+                        json_res, img_p, mov_p, diag_res = generate_prompt(
                             scene_desc, 
                             char_desc,
                             wardrobe_desc,
-                            templates['color_palettes'][color_choice],
-                            templates['director_styles'][director_choice],
+                            TEMPLATES['color_palettes'][color_choice],
+                            TEMPLATES['director_styles'][director_choice],
                             lens_choice,
                             stock_choice,
-                            templates['camera_movements'][movement_choice],
+                            TEMPLATES['camera_movements'][movement_choice],
                             angle,
-                            templates['shot_angles'][angle],
+                            TEMPLATES['shot_angles'][angle],
                             engine_choice
                         )
-                        results.append((json_res, prompt_res, diag_res))
+                        results.append((json_res, img_p, mov_p, diag_res))
                     st.session_state['shot_list_v2'] = results
 
         with col2:
             st.write("### 💎 Salida Cinematográfica (V2)")
             if 'shot_list_v2' in st.session_state:
-                for i, (json_res, prompt_res, diag_res) in enumerate(st.session_state['shot_list_v2']):
+                for i, (json_res, img_p, mov_p, diag_res) in enumerate(st.session_state['shot_list_v2']):
                     with st.expander(f"Toma {i+1}: {json_res['tipo_de_toma']} | {json_res['movimiento']} ({engine_choice})", expanded=(i==0)):
-                        st.write("#### 🚀 Prompt Optimizado")
-                        st.text_area(f"Prompt {i+1}:", value=prompt_res, height=120, key=f"p_v2_{i}")
+                        st.write("#### 🖼️ Prompt de Imagen")
+                        st.code(img_p, language=None)
                         
-                        # Optimized prompt display with built-in copy button
-                        st.code(prompt_res, language=None)
-                        st.info("💡 Haz clic en el botón de la esquina superior derecha del cuadro gris para copiar.")
+                        st.write("#### 🎥 Movimiento de Cámara")
+                        st.code(mov_p, language=None)
+                        
+                        st.info("💡 Haz clic en el botón de la esquina superior derecha de cada cuadro para copiar.")
 
                         st.write("---")
                         # Image generation removed per user request
@@ -461,7 +467,7 @@ def main():
                     angle_idx = int(i % len(shot_angles_keys_list))
                     angle = shot_angles_keys_list[angle_idx]
                     
-                    json_res, prompt_res, diag_res = generate_prompt(
+                    json_res, img_p, mov_p, diag_res = generate_prompt(
                         m_data.get('action', ''), 
                         m_data.get('char', ''),
                         m_data.get('wardrobe', ''),
@@ -474,27 +480,27 @@ def main():
                         TEMPLATES['shot_angles'][angle],
                         engine_choice
                     )
-                    results.append((json_res, prompt_res, diag_res))
+                    results.append((json_res, img_p, mov_p, diag_res))
                 st.session_state['parsed_list'] = results
 
         if 'parsed_list' in st.session_state:
             st.write("### 🎬 Lista de Tomas Derivada del Guion")
-            for i, (json_res, prompt_res, diag_res) in enumerate(st.session_state['parsed_list']):
-                with st.expander(f"Momento de Escena {i+1}: {json_res['tipo_de_toma']} | {json_res['movimiento']}", expanded=(i==0)):
+            for i, (json_res, img_p, mov_p, diag_res) in enumerate(st.session_state['parsed_list']):
+                with st.expander(f"Momento {i+1}: {json_res['tipo_de_toma']} | {json_res['movimiento']}", expanded=(i==0)):
                     st.write(f"**Acción:** *{json_res['descripcion']}*")
                     
-                    # Botón de carga rápida (Sincronizado con Master)
-                    if st.button(f"📋 Cargar Toma {i+1} en Panel", key=f"btn_copy_{i}"):
+                    # Carga rápida
+                    if st.button(f"📋 Cargar Toma {i+1}", key=f"btn_copy_{i}"):
                         st.session_state['scene_creator'] = json_res['descripcion']
                         st.session_state['char_master'] = json_res['datos_de_consistencia']['rasgos_personaje']
                         st.session_state['wardrobe_master'] = json_res['datos_de_consistencia']['vestuario']
-                        st.success(f"¡Toma {i+1} cargada satisfactoriamente! Los anclas de continuidad se han actualizado.")
+                        st.success("¡Toma cargada!")
                         st.rerun()
 
-                    st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
-                    
-                    # Copy block for script analyzer
-                    st.code(prompt_res, language=None)
+                    st.write("#### 🖼️ Prompt de Imagen")
+                    st.code(img_p, language=None)
+                    st.write("#### 🎥 Movimiento")
+                    st.code(mov_p, language=None)
 
     with tabs[2]:
         st.write("### 🎵 Generador de Storyboard por Ritmo")
