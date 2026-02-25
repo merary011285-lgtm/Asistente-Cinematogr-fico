@@ -248,27 +248,39 @@ def analyze_audio_with_gemini(audio_file_path, char_desc, vibe, mime_type, durat
         duration_info = f"Duration: {round(duration_seconds, 1)} seconds." if duration_seconds > 0 else ""
         
         prompt = f"""
-        Analyze this audio ({duration_info}) and create a COMPREHENSIVE cinematographic storyboard that covers the ENTIRE timeline from start to finish.
+        Analyze this audio ({duration_info}) and create a COMPREHENSIVE cinematographic storyboard.
         
-        Character Context: {char_desc}
-        Style/Vibe: {vibe}
+        MANDATORY STEP 1: PRODUCTION BIBLE
+        Based on the lyrics, rhythm, and vibe, detect and define:
+        - LOCATION: Where is this taking place?
+        - CHARACTER: Who is the protagonist? (Physical traits)
+        - WARDROBE: What are they wearing?
+        - EPOCH: When is this happening? (Past, Present, Future, Specific Year)
         
-        Mandatory Rules:
-        1. Distribution: Spread shots evenly across the whole {duration_seconds}s. Do NOT stop after the first 60 seconds.
-        2. Sequence: Provide as many shots as needed to represent the full emotional arc of the audio.
-        3. For each shot, provide:
-           - Timestamp (e.g., 0:05, 1:20, 2:45)
-           - Scene Action (English)
-           - Recommended Shot Type (English)
-           - Mood/Atmosphere (English)
+        MANDATORY STEP 2: STORYBOARD SEQUENCE
+        Create a sequence of shots covering the entire {duration_seconds}s.
+        For each shot, provide:
+        - Timestamp (e.g., 0:05)
+        - Scene Action (Technical English)
+        - Shot Type & Angle (Technical English)
+        - Mood/Atmosphere
         
-        Maintain absolute visual consistency for the character across all shots.
-        Format the output clearly using markdown.
+        FORMATTING RULE:
+        Start your response with a JSON-like block for the PRODUCTION BIBLE so I can parse it, then follow with the Markdown Storyboard.
+        Example:
+        ---PRODUCTION_BIBLE---
+        LOCATION: [Value]
+        CHARACTER: [Value]
+        WARDROBE: [Value]
+        EPOCH: [Value]
+        ---END_BIBLE---
+        
+        Maintain absolute visual consistency across all shots based on the PRODUCTION BIBLE.
         """
         
         response = None
         # Probamos varios identificadores comunes para asegurar compatibilidad en 2026
-        for model_id in ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.0-flash']:
+        for model_id in ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash']:
             try:
                 response = client.models.generate_content(
                     model=model_id,
@@ -317,20 +329,12 @@ def main():
         intel_choice = st.selectbox("Motor de Razonamiento:", ["GPT-4o-mini (Fast)", "GPT-5.2", "Gemini Flash (Free)"], index=0)
         
         st.write("### 🎥 Cámara y Estilo")
-        # Explicit dict conversion to help linter
-        d_styles = dict(TEMPLATES["director_styles"])
-        director_choice = st.selectbox("Firma Visual del Director:", list(d_styles.keys()))
-        
-        l_presets = dict(TEMPLATES["lens_presets"])
-        lens_choice = st.selectbox("Características del Lente:", list(l_presets.keys()))
-
-        c_movements = dict(TEMPLATES["camera_movements"])
-        movement_choice = st.selectbox("Movimiento de Cámara:", list(c_movements.keys()))
-        
+        # Use direct dict access from TEMPLATES to satisfy linter
+        director_choice = st.selectbox("Firma Visual del Director:", list(TEMPLATES["director_styles"].keys()))
+        lens_choice = st.selectbox("Características del Lente:", list(TEMPLATES["lens_presets"].keys()))
+        movement_choice = st.selectbox("Movimiento de Cámara:", list(TEMPLATES["camera_movements"].keys()))
         stock_choice = st.selectbox("Tipo de Película (Stock):", list(TEMPLATES['film_stocks']))
-        
-        c_palettes = dict(TEMPLATES["color_palettes"])
-        color_choice = st.selectbox("Paleta de Color:", list(c_palettes.keys()))
+        color_choice = st.selectbox("Paleta de Color:", list(TEMPLATES["color_palettes"].keys()))
         
         st.write("### 🚀 Motor de IA Destino")
         engine_choice = st.selectbox("Optimizar para:", ["Meta AI / Grok", "Midjourney", "DALL-E 3", "Qwen / Flux"])
@@ -350,7 +354,7 @@ def main():
             wardrobe_desc = st.session_state['wardrobe_master']
             
             st.write("### 📸 Ángulos de Cámara")
-            shot_angles_keys = list(templates['shot_angles'].keys())
+            shot_angles_keys = list(TEMPLATES['shot_angles'].keys())
             selected_angles = st.multiselect("Selecciona ángulos para la lista de tomas:", shot_angles_keys, default=["Plano General (WS)", "Primer Plano (CU)"], key="angles_creator")
 
             if st.button("🎬 ACCIÓN: Generar Lista de Tomas"):
@@ -448,21 +452,26 @@ def main():
                 if not moments: moments = [script_text[:100]] # Fallback
                 
                 # Assign angles based on keywords or cycle
-                shot_angles_keys_list = list(templates['shot_angles'].keys())
+                shot_angles_keys_list = list(TEMPLATES['shot_angles'].keys())
                 results = []
                 for i, m_data in enumerate(moments): 
-                    angle = shot_angles_keys_list[i % len(shot_angles_keys_list)]
+                    # Type checking to satisfy linter
+                    if not isinstance(m_data, dict): continue
+                    
+                    angle_idx = int(i % len(shot_angles_keys_list))
+                    angle = shot_angles_keys_list[angle_idx]
+                    
                     json_res, prompt_res, diag_res = generate_prompt(
-                        m_data['action'], 
-                        m_data['char'],
-                        m_data['wardrobe'],
-                        templates['color_palettes'][color_choice],
-                        templates['director_styles'][director_choice],
+                        m_data.get('action', ''), 
+                        m_data.get('char', ''),
+                        m_data.get('wardrobe', ''),
+                        TEMPLATES['color_palettes'][color_choice],
+                        TEMPLATES['director_styles'][director_choice],
                         lens_choice,
                         stock_choice,
-                        templates['camera_movements'][movement_choice],
+                        TEMPLATES['camera_movements'][movement_choice],
                         angle,
-                        templates['shot_angles'][angle],
+                        TEMPLATES['shot_angles'][angle],
                         engine_choice
                     )
                     results.append((json_res, prompt_res, diag_res))
@@ -518,11 +527,42 @@ def main():
                         os.remove(tmp_path)
         
         if 'audio_storyboard' in st.session_state:
-            st.write("### 📝 Storyboard Producido")
-            st.markdown(st.session_state['audio_storyboard'])
+            st.write("### � Biblia de Producción & Storyboard")
+            
+            full_text = st.session_state['audio_storyboard']
+            
+            # Parsing the Production Bible
+            bible_data = {}
+            if "---PRODUCTION_BIBLE---" in full_text and "---END_BIBLE---" in full_text:
+                try:
+                    bible_part = full_text.split("---PRODUCTION_BIBLE---")[1].split("---END_BIBLE---")[0].strip()
+                    for line in bible_part.split('\n'):
+                        if ':' in line:
+                            k, v = line.split(':', 1)
+                            bible_data[k.strip().upper()] = v.strip()
+                except Exception:
+                    pass
+            
+            if bible_data:
+                cols = st.columns(4)
+                with cols[0]: st.metric("📍 Localización", bible_data.get('LOCATION', 'N/A'))
+                with cols[1]: st.metric("👤 Personaje", bible_data.get('CHARACTER', 'N/A')[:20] + "...")
+                with cols[2]: st.metric("👕 Vestuario", bible_data.get('WARDROBE', 'N/A')[:20] + "...")
+                with cols[3]: st.metric("⏳ Época", bible_data.get('EPOCH', 'N/A'))
+                
+                if st.button("🔄 Sincronizar Biblia con Master de Continuidad"):
+                    if 'CHARACTER' in bible_data: st.session_state['char_master'] = bible_data['CHARACTER']
+                    if 'WARDROBE' in bible_data: st.session_state['wardrobe_master'] = bible_data['WARDROBE']
+                    st.success("¡Continuidad sincronizada!")
+                    st.rerun()
             
             st.write("---")
-            st.caption("Tip: Puedes copiar estas descripciones al Panel de Control para generar los prompts técnicos finales.")
+            # Remove the bible block from display to keep it clean if desired, or show it all
+            display_text = full_text.split("---END_BIBLE---")[-1].strip() if "---END_BIBLE---" in full_text else full_text
+            st.markdown(display_text)
+            
+            st.write("---")
+            st.caption("Tip: Los detalles de personaje y vestuario detectados se pueden aplicar a todo el proyecto usando el botón de sincronización.")
 
 if __name__ == "__main__":
     main()
