@@ -122,8 +122,14 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, mo
     
     technical_details = f"Shot on IMAX MSM 9802 15/70mm film, {lens} lenses, {stock} film stock. Aspect ratio {aspect_ratio}."
     
-    # Anclas de Consistencia (en inglés para la IA)
-    consistency_block = f"Character trait: {character}. Wardrobe: {wardrobe}. Color Palette: {color}."
+    # Anclas de Consistencia Blindada (EN)
+    # Forced visual consistency for image generators
+    consistency_block = (
+        f"CHARACTER CONTINUITY: {character}. "
+        f"WARDROBE CONSISTENCY: {wardrobe}. "
+        f"COLOR SCHEME: {color}. "
+        "Maintain identical facial features and identical clothing textures across shots."
+    )
     
     # Optimización del Motor
     engine_suffix = ""
@@ -131,11 +137,12 @@ def generate_prompt(scene, character, wardrobe, color, director, lens, stock, mo
         ratio = "2.76:1" if is_anamorphic else "1.43:1"
         engine_suffix = f" --ar {ratio} --v 6 --stylize 250"
     elif engine == "DALL-E 3":
-        engine_suffix = " Wide-screen cinematic mode, highly detailed."
+        engine_suffix = " Wide-screen cinematic mode, hyper-photorealistic, maintain exact visual continuity with previous frames."
 
     # Prompt final (Totalmente en Inglés)
     full_prompt = (
-        f"{angle_name}: {scene}. {angle_desc}. Camera Movement: {movement}. {consistency_block}. {director}. {technical_details}. "
+        f"{angle_name}: {scene}. {angle_desc}. Camera Movement: {movement}. "
+        f"{consistency_block} {director}. {technical_details}. "
         f"Key visual traits: {'oval bokeh, horizontal lens flares, ' if is_anamorphic else ''}"
         f"extreme detail, naturalistic grain, high dynamic range, 12k resolution texture, visceral atmosphere.{engine_suffix}"
     )
@@ -291,23 +298,39 @@ def main():
     tabs = st.tabs(["🎮 Panel de Control", "📜 Analizador de Guion", "🎵 Ritmo & Audio (Storyboard)"])
     
     with st.sidebar:
+        st.write("### 🛡️ Master de Continuidad")
+        st.info("Define aquí los rasgos persistentes para todo el proyecto.")
+        
+        # Centralized consistency state
+        shared_char = st.text_area("Ancla: Personaje (Físico):", 
+                                   value=st.session_state.get('char_master', "Un veterano curtido con brazo mecánico"),
+                                   key="char_master_input")
+        shared_wardrobe = st.text_input("Ancla: Vestuario:", 
+                                        value=st.session_state.get('wardrobe_master', "Traje de vuelo desgastado"),
+                                        key="wardrobe_master_input")
+        
+        st.session_state['char_master'] = shared_char
+        st.session_state['wardrobe_master'] = shared_wardrobe
+
+        st.write("---")
         st.write("### 🧠 Inteligencia Maestra")
         intel_choice = st.selectbox("Motor de Razonamiento:", ["GPT-4o-mini (Fast)", "GPT-5.2", "Gemini Flash (Free)"], index=0)
         
         st.write("### 🎥 Cámara y Estilo")
-        director_style_keys = list(templates['director_styles'].keys())
-        director_choice = st.selectbox("Firma Visual del Director:", director_style_keys)
+        # Explicit dict conversion to help linter
+        d_styles = dict(TEMPLATES["director_styles"])
+        director_choice = st.selectbox("Firma Visual del Director:", list(d_styles.keys()))
         
-        lens_presets_keys = list(templates['lens_presets'].keys())
-        lens_choice = st.selectbox("Características del Lente:", lens_presets_keys)
+        l_presets = dict(TEMPLATES["lens_presets"])
+        lens_choice = st.selectbox("Características del Lente:", list(l_presets.keys()))
 
-        movement_keys = list(templates['camera_movements'].keys())
-        movement_choice = st.selectbox("Movimiento de Cámara:", movement_keys)
+        c_movements = dict(TEMPLATES["camera_movements"])
+        movement_choice = st.selectbox("Movimiento de Cámara:", list(c_movements.keys()))
         
-        stock_choice = st.selectbox("Tipo de Película (Stock):", templates['film_stocks'])
+        stock_choice = st.selectbox("Tipo de Película (Stock):", list(TEMPLATES['film_stocks']))
         
-        color_palettes_keys = list(templates['color_palettes'].keys())
-        color_choice = st.selectbox("Paleta de Color:", color_palettes_keys)
+        c_palettes = dict(TEMPLATES["color_palettes"])
+        color_choice = st.selectbox("Paleta de Color:", list(c_palettes.keys()))
         
         st.write("### 🚀 Motor de IA Destino")
         engine_choice = st.selectbox("Optimizar para:", ["Meta AI / Grok", "Midjourney", "DALL-E 3", "Qwen / Flux"])
@@ -316,10 +339,15 @@ def main():
         col1, col2 = st.columns([1, 1.5])
         
         with col1:
-            st.write("### 👥 Escena y Consistencia de Personaje")
+            st.write("### 👥 Escena y Acción Local")
             scene_desc = st.text_area("Entorno de la Escena:", placeholder="Una estación espacial abandonada orbitando un sol moribundo...", key="scene_creator")
-            char_desc = st.text_area("Perfil del Personaje (Rasgos constantes):", placeholder="Un veterano curtido con un brazo mecánico y barba blanca.", key="char_creator")
-            wardrobe_desc = st.text_input("Detalles del Vestuario:", placeholder="Traje de vuelo desgastado con insignias remendadas.", key="wardrobe_creator")
+            
+            # Using master consistency states
+            st.write(f"**Ancla Personaje:** `{st.session_state['char_master']}`")
+            st.write(f"**Ancla Vestuario:** `{st.session_state['wardrobe_master']}`")
+            
+            char_desc = st.session_state['char_master']
+            wardrobe_desc = st.session_state['wardrobe_master']
             
             st.write("### 📸 Ángulos de Cámara")
             shot_angles_keys = list(templates['shot_angles'].keys())
@@ -381,14 +409,38 @@ def main():
                 st.error("Por favor, proporciona el texto del guion e identidad del personaje.")
             else:
                 if intel_choice:
-                    with st.spinner(f"{intel_choice} analizando subtexto y narrativa visual..."):
-                        system_instr = "Eres un Director de Fotografía experto. Analiza el guion y devuelve UNA LISTA de hasta 5 momentos clave. Para cada momento, describe la acción en una frase. Sé técnico y preciso."
+                    with st.spinner(f"{intel_choice} analizando subtexto y persistencia visual..."):
+                        system_instr = """Eres un Director de Fotografía experto y Jefe de Continuidad. 
+                        Analiza el guion y devuelve UNA LISTA de hasta 5 momentos clave.
+                        
+                        REGLA DE ORO DE CONTINUIDAD:
+                        Para cada momento, debes mantener la descripción del personaje y vestuario EXACTAMENTE igual a lo detectado inicialmente en el fragmento.
+                        
+                        Devuelve: 
+                        1. Descripción de la acción (en una frase técnica).
+                        2. Rasgos físicos del personaje (persiste en cada toma).
+                        3. Detalles del vestuario (persiste en cada toma).
+                        
+                        Formato: Acción | Personaje | Vestuario"""
+                        
                         analysis = generate_intelligence(system_instr, f"Guion: {script_text}", intel_choice)
                         if analysis:
-                            # Parsear la lista (asumiendo formato de lista)
-                            moments = [m.strip() for m in analysis.split('\n') if len(m.strip()) > 5][:5]
+                            # Parsear la lista mejorada
+                            moments_data = []
+                            for line in analysis.split('\n'):
+                                if '|' in line:
+                                    parts = line.split('|')
+                                    if len(parts) >= 3:
+                                        moments_data.append({
+                                            'action': parts[0].strip(),
+                                            'char': parts[1].strip(),
+                                            'wardrobe': parts[2].strip()
+                                        })
+                            moments = moments_data[:5]
                         else:
-                            moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10][:5]
+                            # Fallback simple
+                            moments = [{'action': line.strip(), 'char': parser_char, 'wardrobe': parser_wardrobe} 
+                                      for line in script_text.split('.') if len(line.strip()) > 10][:5]
                 else:
                     # Simple logic to simulate "parsing" key moments
                     moments = [line.strip() for line in script_text.split('.') if len(line.strip()) > 10][:5]
@@ -398,12 +450,12 @@ def main():
                 # Assign angles based on keywords or cycle
                 shot_angles_keys_list = list(templates['shot_angles'].keys())
                 results = []
-                for i, moment in enumerate(moments): 
+                for i, m_data in enumerate(moments): 
                     angle = shot_angles_keys_list[i % len(shot_angles_keys_list)]
                     json_res, prompt_res, diag_res = generate_prompt(
-                        moment, 
-                        parser_char,
-                        parser_wardrobe,
+                        m_data['action'], 
+                        m_data['char'],
+                        m_data['wardrobe'],
                         templates['color_palettes'][color_choice],
                         templates['director_styles'][director_choice],
                         lens_choice,
@@ -422,12 +474,12 @@ def main():
                 with st.expander(f"Momento de Escena {i+1}: {json_res['tipo_de_toma']} | {json_res['movimiento']}", expanded=(i==0)):
                     st.write(f"**Acción:** *{json_res['descripcion']}*")
                     
-                    # Botón de carga rápida
+                    # Botón de carga rápida (Sincronizado con Master)
                     if st.button(f"📋 Cargar Toma {i+1} en Panel", key=f"btn_copy_{i}"):
                         st.session_state['scene_creator'] = json_res['descripcion']
-                        st.session_state['char_creator'] = parser_char
-                        st.session_state['wardrobe_creator'] = parser_wardrobe
-                        st.success(f"¡Toma {i+1} cargada satisfactoriamente! Ve a la pestaña 'Panel de Control'.")
+                        st.session_state['char_master'] = json_res['datos_de_consistencia']['rasgos_personaje']
+                        st.session_state['wardrobe_master'] = json_res['datos_de_consistencia']['vestuario']
+                        st.success(f"¡Toma {i+1} cargada satisfactoriamente! Los anclas de continuidad se han actualizado.")
                         st.rerun()
 
                     st.text_area(f"Prompt Optimizado {i+1}:", value=prompt_res, height=100, key=f"ps_{i}")
